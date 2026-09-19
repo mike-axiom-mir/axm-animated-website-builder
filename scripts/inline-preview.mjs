@@ -18,8 +18,8 @@ const [source, css, jsSource] = await Promise.all([
 ]);
 const js = jsSource.replaceAll("</script", "<\\/script");
 const html = source
-  .replace(/<link[^>]+href="[^"]+\.css"[^>]*>/, `<style>${css}</style>`)
-  .replace(/<script[^>]+src="[^"]+\.js"[^>]*><\/script>/, `<script type="module">${js}</script>`);
+  .replace(/<link[^>]+href="[^"]+\.css"[^>]*>/, () => `<style>${css}</style>`)
+  .replace(/<script[^>]+src="[^"]+\.js"[^>]*><\/script>/, () => `<script type="module">${js}</script>`);
 
 await writeFile(path.join(root, "dist", "inline-preview.html"), html);
 console.log(`Prepared dist/inline-preview.html (${Buffer.byteLength(html)} bytes)`);
