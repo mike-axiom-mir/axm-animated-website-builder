@@ -43,10 +43,20 @@ The local and remote executable commit identities differ because the connected G
 1. The first self-contained editor preview treated `$` sequences in the JavaScript bundle as string-replacement tokens and exposed source text in the page. Commit `98667957e3b3b9bb0db14c62d655c7619459455b` repaired the generator by using function replacements.
 2. The first standalone example contained one extra closing brace. Browser evidence showed a page-level `SyntaxError`; head `d3ea03a11345b36b39ab44cdd5f1c6e94640d088` removed it and added a parse regression test.
 
+## First real AXM front-door continuation — 2026-09-20
+
+- Front-door project: `src/projects/axmFrontDoor.js`.
+- Real use exposed two concrete controls the single-hero proof did not exercise: semantic navigation/scrollable sections and per-section surface choice.
+- The editor preview and standalone exporter now consume the same canonical section data; no separate front-door-only rendering model was introduced.
+- Local pure model/export regression suite: 8/8 passed before the remote commit.
+- Remote verification on executable head `dc8d38c88dae101638afc09d8792dcd7e018275b`: `npm test`, `npm run build`, and `npm run test:sites` all passed in GitHub Actions run `35477435904`.
+- The tracked standalone preview is regenerated from `AXM_FRONT_DOOR_PROJECT` in the evidence successor to that executable head.
+- MorphTile remains a reusable pattern/source boundary; its engine is not embedded here.
+
 ## Honest holds
 
 - The draft PR is not merged; user visual acceptance remains open.
 - The scene is Canvas 2D/2.5D, not full 3D or WebGL.
 - Image/video adapters are structurally implemented, but representative media files have not yet been visually accepted.
 - Performance has not been measured across production devices.
-- This is not yet the AXM front-door website; it is the builder proof that can create it.
+- The first AXM front-door project is now implemented through the builder, but its fresh browser visual acceptance is still open.
