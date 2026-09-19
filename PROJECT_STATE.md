@@ -2,16 +2,16 @@
 
 Recorded: 2026-09-19T22:42:17Z
 
-## Exact candidate identity
+## Verified candidate identity
 
 - Draft PR: `mike-axiom-mir/axm-animated-website-builder#1`
 - Remote review branch: `world-stage-builder-v0`
-- Remote head: `d3ea03a11345b36b39ab44cdd5f1c6e94640d088`
-- Remote tree: `75f7088b42342f2e9cdcbd2a9fc5d4529edd7577`
+- Executable evidence head: `d3ea03a11345b36b39ab44cdd5f1c6e94640d088`
+- Executable evidence tree: `75f7088b42342f2e9cdcbd2a9fc5d4529edd7577`
 - Local commit: `a15a99287346c44212ea73be81900fc143080226`
 - Local tree: `75f7088b42342f2e9cdcbd2a9fc5d4529edd7577`
 
-The local and remote commit identities differ because the connected GitHub writer created the remote commits, but their current content tree is byte-identical.
+The local and remote executable commit identities differ because the connected GitHub writer created the remote commits, but their executable content tree is byte-identical. This record lives in a documentation-only successor of the verified code head; read the branch ref for the current documentation commit identity.
 
 ## Implemented in the candidate
 
