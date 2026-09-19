@@ -26,6 +26,9 @@ test("standalone export contains runtime and page but not editor chrome", () => 
   assert.match(html, /LIVE FRONTEND LAYER/);
   assert.doesNotMatch(html, /Scene layers/);
   assert.doesNotMatch(html, /Edit source/);
+  const script = html.match(/<script>([\s\S]*)<\/script>/);
+  assert.ok(script, "standalone runtime script is present");
+  assert.doesNotThrow(() => new Function(script[1]), "standalone runtime script parses");
 });
 
 test("standalone export refuses an unresolved media source", () => {
