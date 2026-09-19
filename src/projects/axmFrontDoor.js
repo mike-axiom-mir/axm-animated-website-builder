@@ -1,0 +1,89 @@
+import { DEFAULT_PROJECT } from "../model/project.js";
+
+export const AXM_FRONT_DOOR_PROJECT = {
+  ...DEFAULT_PROJECT,
+  title: "Build with AI. Keep your agency.",
+  eyebrow: "AXM / AXIOM–MIR",
+  action: "See the system",
+  background: {
+    ...DEFAULT_PROJECT.background,
+    type: "world",
+    state: "arrival",
+    seed: 31,
+    atmosphere: 82,
+  },
+  page: {
+    ...DEFAULT_PROJECT.page,
+    surface: "clear",
+    navigation: [
+      { label: "Why", href: "#why" },
+      { label: "Method", href: "#method" },
+      { label: "Workshop", href: "#workshop" },
+      { label: "Roots", href: "#roots" },
+    ],
+    heroNote: "Human + machine collaboration with truth, consent, continuity and visible control kept in the loop.",
+    sections: [
+      {
+        id: "why",
+        eyebrow: "WHY AXM",
+        title: "Capability should expand agency.",
+        body: "AXM is a human + AI collaboration project built around a simple boundary: machines can reason, create, challenge and help execute, while goals, consent and ownership stay visible. Useful AI should give people more room to act—not quietly take the steering wheel.",
+        surface: "glass",
+        points: [
+          "Truth before story",
+          "Consent before hidden control",
+          "Source integrity before convenient certainty",
+        ],
+      },
+      {
+        id: "method",
+        eyebrow: "HOW IT WORKS",
+        title: "One grounded state. Many useful perspectives.",
+        body: "AXM separates durable project state from temporary views. Specialists can inspect, build, test and repair the same source of truth without turning chat history into the product. That makes work easier to verify, recover and move between local tools, websites, games and future machines.",
+        surface: "clear",
+        points: [
+          "Inspectable state instead of hidden handoffs",
+          "Repair, rollback and explicit evidence",
+          "AI can disagree without silently rewriting the goal",
+        ],
+      },
+      {
+        id: "workshop",
+        eyebrow: "THE WORKSHOP",
+        title: "Create, test, keep the useful parts.",
+        body: "The workshop treats software and media as reusable building blocks. A world, interface, asset or tool can be tried in place, saved when it earns its keep, and reused later without forcing the whole system to become one giant engine.",
+        surface: "solid",
+        points: [
+          "Local and offline paths where they matter",
+          "Portable project data",
+          "Published output stays lighter than the authoring system",
+        ],
+      },
+      {
+        id: "roots",
+        eyebrow: "ROOTS",
+        title: "Freedom through better structure.",
+        body: "AXM is being built around four merge gates: truth, agency without domination, continuity, and wisdom before speed. The goal is not to make AI look independent. The goal is to make collaboration more capable while keeping its reasoning and boundaries legible.",
+        surface: "glass",
+        points: [
+          "Truth",
+          "Agency / non-domination",
+          "Continuity",
+          "Wisdom before speed",
+        ],
+        links: [
+          { label: "Explore the work on GitHub", href: "https://github.com/mike-axiom-mir" },
+        ],
+      },
+    ],
+    footer: {
+      left: "MIKE · AXIOM / MIR",
+      right: "HUMAN + MACHINE · BUILT IN LAYERS",
+    },
+  },
+  metadata: {
+    ...DEFAULT_PROJECT.metadata,
+    projectId: "axm-front-door-v1",
+    purpose: "First real AXM front-door website",
+  },
+};

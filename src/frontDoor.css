@@ -1,0 +1,214 @@
+/* First real AXM front door. These rules extend the existing World Stage skin;
+   the canonical page content stays in project state. */
+.site-page-layer {
+  display: block;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #173846 transparent;
+}
+
+.site-page-layer.is-yielding {
+  opacity: .16;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 23px 34px;
+  background: linear-gradient(180deg, rgba(2, 9, 14, .82), rgba(2, 9, 14, .36), transparent);
+  backdrop-filter: blur(10px);
+}
+
+.site-nav a {
+  color: rgba(235, 250, 255, .72);
+  text-decoration: none;
+}
+
+.site-nav a:hover { color: #fff; }
+
+.site-hero {
+  min-height: calc(100% - 66px);
+  padding: 78px 34px 60px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.hero-surface {
+  width: min(100%, 980px);
+}
+
+.hero-action { text-decoration: none; }
+
+.hero-note {
+  display: block;
+  max-width: 660px;
+  margin: 20px auto 0;
+  color: #9bb4bd;
+  font-size: 10px;
+  line-height: 1.65;
+  letter-spacing: .035em;
+}
+
+.site-sections {
+  width: min(1040px, calc(100% - 42px));
+  margin: 0 auto;
+  padding: 32px 0 88px;
+  display: grid;
+  gap: 20px;
+}
+
+.site-section {
+  display: grid;
+  grid-template-columns: minmax(120px, .38fr) minmax(0, 1fr);
+  gap: clamp(24px, 5vw, 64px);
+  padding: clamp(28px, 4vw, 54px);
+  border-radius: 10px;
+  scroll-margin-top: 82px;
+}
+
+.site-section.surface-glass {
+  border: 1px solid rgba(104, 226, 255, .2);
+  background: rgba(2, 15, 23, .56);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .18);
+}
+
+.site-section.surface-solid {
+  border: 1px solid rgba(105, 205, 232, .14);
+  background: rgba(7, 24, 34, .95);
+}
+
+.site-section.surface-clear {
+  border-top: 1px solid rgba(104, 226, 255, .18);
+  border-bottom: 1px solid rgba(104, 226, 255, .09);
+}
+
+.section-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #6deaff;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .27em;
+  text-transform: uppercase;
+}
+
+.section-label i {
+  height: 1px;
+  flex: 1;
+  min-width: 18px;
+  margin-top: 6px;
+  background: linear-gradient(90deg, rgba(61, 231, 255, .5), transparent);
+}
+
+.section-copy h2 {
+  max-width: 760px;
+  margin: 0;
+  color: #f3fbfd;
+  font-size: clamp(28px, 4vw, 54px);
+  line-height: 1;
+  letter-spacing: -.045em;
+  font-weight: 560;
+  text-wrap: balance;
+}
+
+.section-copy > p {
+  max-width: 760px;
+  margin: 19px 0 0;
+  color: #b5cbd3;
+  font-size: clamp(12px, 1.4vw, 16px);
+  line-height: 1.72;
+}
+
+.section-copy ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.section-copy li {
+  position: relative;
+  padding: 11px 12px 11px 26px;
+  border-top: 1px solid rgba(121, 205, 226, .13);
+  color: #d3e6eb;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.section-copy li::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 15px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgba(56, 234, 255, .55);
+}
+
+.section-links { margin-top: 26px; }
+
+.section-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid rgba(56, 234, 255, .46);
+  border-radius: 5px;
+  color: #e5fbff;
+  background: rgba(4, 27, 36, .58);
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.site-footer {
+  padding: 28px 34px 32px;
+}
+
+.published-shell .site-page-layer { padding: 0; }
+
+.published-shell .site-hero {
+  min-height: calc(100% - 70px);
+  padding: 96px clamp(24px, 4vw, 68px) 72px;
+}
+
+.published-shell .site-sections {
+  width: min(1120px, calc(100% - 48px));
+  padding-bottom: 110px;
+}
+
+@container (max-width: 560px) {
+  .site-page-layer { padding: 0; }
+  .site-nav { padding: 20px 17px; }
+  .site-hero, .published-shell .site-hero { min-height: calc(100% - 58px); padding: 52px 16px 44px; }
+  .hero-surface, .published-shell .hero-surface { width: 100%; padding: 26px 14px 24px; }
+  .hero-note { font-size: 9px; }
+  .site-sections, .published-shell .site-sections { width: calc(100% - 24px); padding: 18px 0 62px; }
+  .site-section { grid-template-columns: 1fr; gap: 20px; padding: 24px 18px; }
+  .section-copy h2 { font-size: clamp(32px, 11cqw, 46px); }
+  .section-copy > p { font-size: 12px; }
+  .section-copy ul { grid-template-columns: 1fr; }
+  .site-footer { padding: 24px 18px 28px; line-height: 1.7; }
+}
+
+@media (max-width: 760px) {
+  .site-page-layer { padding: 0; }
+  .published-shell .site-page-layer { padding: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-page-layer { scroll-behavior: auto; }
+}

@@ -29,13 +29,13 @@ import {
 import { BackgroundRuntime } from "./runtime/WorldCanvas.jsx";
 import {
   BACKGROUND_TYPES,
-  DEFAULT_PROJECT,
   SCENE_STATES,
   projectSnapshot,
   updateProject,
   validateProject,
 } from "./model/project.js";
 import { downloadStandaloneSite } from "./export/exportSite.js";
+import { AXM_FRONT_DOOR_PROJECT } from "./projects/axmFrontDoor.js";
 
 const backgroundOptions = [
   { id: "world", label: "Live world", icon: Sparkles, note: "Procedural canvas" },
@@ -72,27 +72,69 @@ function SubRow({ label, selected, dot, onClick, icon: Icon = Folder }) {
 }
 
 function PageOverlay({ project, interactive, onAction }) {
+  const navigation = project.page.navigation || [];
+  const sections = project.page.sections || [];
+  const firstSection = sections[0]?.id ? `#${sections[0].id}` : "#";
+  const footer = project.page.footer || {};
+
   return (
     <div className={`site-page-layer${interactive ? " is-yielding" : ""}`}>
       {project.page.showNavigation && (
         <nav className="site-nav" aria-label="Published site navigation preview">
-          <span className="site-brand"><BrandMark /> AXM</span>
-          <div><span>Worlds</span><span>Studio</span><span>About</span></div>
+          <a className="site-brand" href="#"><BrandMark /> AXM</a>
+          <div>
+            {navigation.map((item) => <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>)}
+          </div>
         </nav>
       )}
       <section className="site-hero">
         <div className={`hero-surface surface-${project.page.surface}`}>
           <p>{project.eyebrow}</p>
           <h1>{project.title}</h1>
-          <button className="hero-action" onClick={onAction} type="button">
-            {project.background.type === "game" ? <Gamepad2 size={17} /> : <Play size={17} />}
-            {project.background.type === "game" ? "Enter world" : project.action}
-          </button>
+          {project.background.type === "game" ? (
+            <button className="hero-action" onClick={onAction} type="button">
+              <Gamepad2 size={17} /> Enter world
+            </button>
+          ) : (
+            <a className="hero-action" href={firstSection}>
+              <Play size={17} /> {project.action}
+            </a>
+          )}
+          {project.page.heroNote && <small className="hero-note">{project.page.heroNote}</small>}
         </div>
       </section>
+      {sections.length > 0 && (
+        <div className="site-sections">
+          {sections.map((section) => (
+            <section className={`site-section surface-${section.surface || "clear"}`} id={section.id} key={section.id}>
+              <div className="section-label"><span>{section.eyebrow}</span><i /></div>
+              <div className="section-copy">
+                <h2>{section.title}</h2>
+                <p>{section.body}</p>
+                {section.points?.length > 0 && <ul>{section.points.map((point) => <li key={point}>{point}</li>)}</ul>}
+                {section.links?.length > 0 && (
+                  <div className="section-links">
+                    {section.links.map((link) => (
+                      <a
+                        className="section-link"
+                        href={link.href}
+                        key={`${link.href}-${link.label}`}
+                        target={link.href.startsWith("http") ? "_blank" : undefined}
+                        rel={link.href.startsWith("http") ? "noreferrer" : undefined}
+                      >
+                        {link.label} <span aria-hidden="true">↗</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
       <footer className="site-footer">
-        <span>IDEAS SHAPE WORLDS</span>
-        <span>LIVE FRONTEND LAYER</span>
+        <span>{footer.left || "IDEAS SHAPE WORLDS"}</span>
+        <span>{footer.right || "LIVE FRONTEND LAYER"}</span>
       </footer>
     </div>
   );
@@ -182,7 +224,7 @@ function SceneRail({ project, setProject, uploadRef, isOpen, onClose }) {
             ))}
           </div>
           <SubRow label="Hero" selected dot />
-          <SubRow label="Sections" />
+          <SubRow label={`Sections · ${project.page.sections?.length || 0}`} dot={Boolean(project.page.sections?.length)} />
           <SubRow label="Navigation" />
           <SubRow label="Media" />
         </RailRow>
@@ -223,7 +265,7 @@ function StateStrip({ project, setProject }) {
 }
 
 export function App() {
-  const [project, setProject] = useState(DEFAULT_PROJECT);
+  const [project, setProject] = useState(AXM_FRONT_DOOR_PROJECT);
   const [mode, setMode] = useState("edit");
   const [interactive, setInteractive] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
@@ -256,9 +298,9 @@ export function App() {
     event.target.value = "";
   };
   const resetProject = () => {
-    setProject(DEFAULT_PROJECT);
+    setProject(AXM_FRONT_DOOR_PROJECT);
     setInteractive(false);
-    showNotice("Project returned to its verified starting state");
+    showNotice("Front door restored to its project baseline");
   };
 
   if (mode === "preview") {

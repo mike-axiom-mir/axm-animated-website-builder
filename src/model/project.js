@@ -48,7 +48,23 @@ export function validateProject(project) {
   if (["video", "image"].includes(project?.background?.type) && !project.background.mediaUrl) {
     holds.push("HOLD_MEDIA_SOURCE_REQUIRED");
   }
-  return { ok: holds.length === 0, holds };
+
+  const sections = project?.page?.sections;
+  if (sections !== undefined && !Array.isArray(sections)) {
+    holds.push("HOLD_INVALID_PAGE_SECTIONS");
+  } else if (Array.isArray(sections)) {
+    const ids = new Set();
+    for (const section of sections) {
+      if (!section?.id || ids.has(section.id)) holds.push("HOLD_INVALID_SECTION_ID");
+      if (section?.id) ids.add(section.id);
+      if (!SURFACE_MODES.includes(section?.surface || "clear")) holds.push("HOLD_UNKNOWN_SECTION_SURFACE");
+    }
+  }
+
+  const navigation = project?.page?.navigation;
+  if (navigation !== undefined && !Array.isArray(navigation)) holds.push("HOLD_INVALID_NAVIGATION");
+
+  return { ok: holds.length === 0, holds: [...new Set(holds)] };
 }
 
 export function projectSnapshot(project) {
