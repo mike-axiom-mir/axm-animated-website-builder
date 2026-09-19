@@ -13,6 +13,7 @@ import {
   Image,
   Layers3,
   Menu,
+  Monitor,
   MonitorPlay,
   MousePointer2,
   PanelTop,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Settings2,
   Sparkles,
+  Smartphone,
   Upload,
   Video,
   X,
@@ -225,6 +227,7 @@ export function App() {
   const [mode, setMode] = useState("edit");
   const [interactive, setInteractive] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
+  const [viewport, setViewport] = useState("desktop");
   const [notice, setNotice] = useState("");
   const uploadRef = useRef(null);
 
@@ -260,12 +263,16 @@ export function App() {
 
   if (mode === "preview") {
     return (
-      <main className="published-shell">
+      <main className={`published-shell is-view-${viewport}`}>
         <Stage project={project} published interactive={interactive} onInteractive={() => setInteractive(true)} onExit={() => setInteractive(false)} />
         {!interactive && (
           <div className="preview-controls">
             <button onClick={() => setMode("edit")} type="button"><ArrowLeft size={17} /> Editor</button>
             <span>Published runtime preview</span>
+            <button onClick={() => setViewport((current) => current === "desktop" ? "mobile" : "desktop")} type="button">
+              {viewport === "desktop" ? <Smartphone size={17} /> : <Monitor size={17} />}
+              {viewport === "desktop" ? "Phone" : "Desktop"}
+            </button>
             <button onClick={exportSite} type="button"><Download size={17} /> Export</button>
           </div>
         )}
@@ -283,7 +290,10 @@ export function App() {
           <button className="is-selected" type="button"><Code2 size={15} /> Edit source</button>
           <button onClick={() => setMode("preview")} type="button"><MonitorPlay size={15} /> Published runtime</button>
         </div>
-        <div className="topbar-meta"><span>1440 × 1024</span><i /><span>100%</span></div>
+        <button className="topbar-meta" onClick={() => setViewport((current) => current === "desktop" ? "mobile" : "desktop")} title="Toggle desktop and phone canvas" type="button">
+          {viewport === "desktop" ? <Monitor size={14} /> : <Smartphone size={14} />}
+          <span>{viewport === "desktop" ? "1440 × 1024" : "390 × 844"}</span><i /><span>100%</span>
+        </button>
         <div className="topbar-actions">
           <button className="secondary-action" onClick={() => setMode("preview")} type="button"><CirclePlay size={17} /> <span>Preview site</span></button>
           <button className="primary-action" onClick={exportSite} type="button"><Download size={17} /> <span>Export</span></button>
@@ -294,7 +304,7 @@ export function App() {
       <SceneRail project={project} setProject={setProject} uploadRef={uploadRef} isOpen={railOpen} onClose={() => setRailOpen(false)} />
       {railOpen && <button className="rail-backdrop" onClick={() => setRailOpen(false)} aria-label="Close scene layers" type="button" />}
 
-      <div className="editor-stage-wrap">
+      <div className={`editor-stage-wrap is-view-${viewport}`}>
         <Stage project={project} interactive={interactive} onInteractive={() => setInteractive(true)} onExit={() => setInteractive(false)} />
         <div className="stage-status"><span className="live-dot" /> Live composition <i /> <b>{project.background.type}</b> beneath <b>{project.page.surface} page</b></div>
         <button className="bind-media" onClick={() => uploadRef.current?.click()} type="button"><Upload size={15} /> Bind local media</button>

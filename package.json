@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "build:inline": "npm run build && node scripts/inline-preview.mjs",
+    "build:review": "npm run build:inline && node scripts/write-example-export.mjs",
     "preview": "vite preview",
     "test": "node --test tests/project-export.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs"
