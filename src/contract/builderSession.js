@@ -1,3 +1,4 @@
+import { normalizeSceneCue, SCENE_RECIPES } from "../model/choreography.js";
 import {
   BACKGROUND_TYPES,
   ELEMENT_MOTIONS,
@@ -21,17 +22,17 @@ const SET_PATHS = new Set([
   "title", "eyebrow", "action",
   "background.type", "background.state", "background.seed", "background.motion",
   "background.atmosphere", "background.mediaUrl", "background.motionProfile", "background.motionScale",
-  "page.surface", "page.interaction", "page.showNavigation", "page.heroNote",
+  "page.surface", "page.interaction", "page.showNavigation", "page.heroNote", "page.choreography.enabled",
   "page.heroTransition.type", "page.heroTransition.duration", "page.heroTransition.delay",
   "page.footer.left", "page.footer.right",
 ]);
-const SECTION_PATCH_KEYS = new Set(["eyebrow", "title", "body", "surface", "points", "links", "transition", "visibility"]);
+const SECTION_PATCH_KEYS = new Set(["eyebrow", "title", "body", "surface", "points", "links", "transition", "visibility", "sceneCue"]);
 const NAV_PATCH_KEYS = new Set(["label", "href"]);
 const BACKGROUND_PATCH_KEYS = new Set([
   "type", "state", "seed", "motion", "atmosphere", "mediaUrl",
   "motionProfile", "motionScale",
 ]);
-const HERO_PATCH_KEYS = new Set(["title", "eyebrow", "action", "heroNote", "surface", "transition"]);
+const HERO_PATCH_KEYS = new Set(["title", "eyebrow", "action", "heroNote", "surface", "transition", "sceneCue"]);
 const ELEMENT_PATCH_KEYS = new Set(["type", "x", "y", "size", "opacity", "motion", "speed", "phase", "tone", "visibility"]);
 
 function failure(code, extra = {}) {
@@ -114,6 +115,30 @@ function applyCommand(project, command) {
     };
   }
 
+  if (command.type === "choreography.configure") {
+    return {
+      ...project,
+      page: {
+        ...project.page,
+        choreography: {
+          ...project.page.choreography,
+          ...(payload.enabled !== undefined ? { enabled: Boolean(payload.enabled) } : {}),
+        },
+      },
+    };
+  }
+
+  if (command.type === "hero.choreograph") {
+    if (!SCENE_RECIPES[payload.sceneCue?.recipe || "inherit"]) throw new Error("HOLD_UNKNOWN_SCENE_RECIPE");
+    return {
+      ...project,
+      page: {
+        ...project.page,
+        heroSceneCue: normalizeSceneCue(payload.sceneCue),
+      },
+    };
+  }
+
   if (command.type === "hero.configure") {
     const patch = onlyPatch(payload, HERO_PATCH_KEYS, "HOLD_INVALID_HERO_PATCH");
     const next = { ...project, page: { ...project.page } };
@@ -129,6 +154,7 @@ function applyCommand(project, command) {
       assertTransition(patch.transition);
       next.page.heroTransition = structuredClone(patch.transition);
     }
+    if (patch.sceneCue !== undefined) next.page.heroSceneCue = normalizeSceneCue(patch.sceneCue);
     return next;
   }
 
@@ -196,12 +222,23 @@ function applyCommand(project, command) {
     return { ...project, page: { ...project.page, sections: next } };
   }
 
+  if (command.type === "section.choreograph") {
+    const index = project.page.sections.findIndex((item) => item.id === payload.id);
+    if (index < 0) throw new Error("HOLD_SECTION_NOT_FOUND");
+    if (!SCENE_RECIPES[payload.sceneCue?.recipe || "inherit"]) throw new Error("HOLD_UNKNOWN_SCENE_RECIPE");
+    const sections = project.page.sections.map((section, itemIndex) => itemIndex === index
+      ? { ...section, sceneCue: normalizeSceneCue(payload.sceneCue) }
+      : section);
+    return { ...project, page: { ...project.page, sections } };
+  }
+
   if (command.type === "section.update") {
     const index = project.page.sections.findIndex((item) => item.id === payload.id);
     if (index < 0) throw new Error("HOLD_SECTION_NOT_FOUND");
     const patch = onlyPatch(payload.patch, SECTION_PATCH_KEYS, "HOLD_INVALID_SECTION_PATCH");
     if (patch.surface !== undefined && !SURFACE_MODES.includes(patch.surface)) throw new Error("HOLD_UNKNOWN_SECTION_SURFACE");
     if (patch.transition !== undefined) assertTransition(patch.transition);
+    if (patch.sceneCue !== undefined && !SCENE_RECIPES[patch.sceneCue?.recipe || "inherit"]) throw new Error("HOLD_UNKNOWN_SCENE_RECIPE");
     const sections = project.page.sections.map((section, itemIndex) => itemIndex === index ? { ...section, ...patch } : section);
     return { ...project, page: { ...project.page, sections } };
   }

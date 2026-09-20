@@ -13,19 +13,18 @@ import {
   createBuilderSession,
 } from "../src/contract/builderSession.js";
 
-test("v2 projects migrate to motion/transition schema v3", () => {
+test("v3 projects migrate to section choreography schema v4", () => {
   const legacy = structuredClone(DEFAULT_PROJECT);
-  legacy.version = 2;
-  delete legacy.background.motionProfile;
-  delete legacy.background.motionScale;
-  delete legacy.background.sceneElements;
-  delete legacy.page.heroTransition;
+  legacy.version = 3;
+  delete legacy.page.choreography;
+  delete legacy.page.heroSceneCue;
+  legacy.page.sections = legacy.page.sections.map(({ sceneCue, ...section }) => section);
   const migrated = migrateProject(legacy);
   assert.equal(migrated.project.version, CURRENT_PROJECT_VERSION);
-  assert.deepEqual(migrated.migrations, ["v2→v3"]);
-  assert.equal(migrated.project.background.motionProfile, "drift");
-  assert.deepEqual(migrated.project.background.sceneElements, []);
-  assert.equal(migrated.project.page.heroTransition.type, "fade");
+  assert.deepEqual(migrated.migrations, ["v3→v4"]);
+  assert.equal(migrated.project.page.choreography.enabled, true);
+  assert.equal(migrated.project.page.heroSceneCue.recipe, "inherit");
+  assert.equal(migrated.project.page.sections.every((section) => section.sceneCue.recipe === "inherit"), true);
 });
 
 test("human and AI changes use the same revisioned session contract", () => {
@@ -229,4 +228,51 @@ test("session snapshot carries current revision, project and actor log", () => {
   assert.equal(snapshot.revision, 0);
   assert.equal(snapshot.project.metadata.projectId, "axm-front-door-v1");
   assert.deepEqual(snapshot.log, []);
+});
+
+
+test("AI assigns reusable choreography recipes and bounded overrides", () => {
+  const session = createBuilderSession(AXM_FRONT_DOOR_PROJECT, { sessionId: "test" });
+  const batch = createBuilderBatch(session, {
+    actor: { type: "ai", id: "website-ai" },
+    label: "Choreograph workshop",
+    commands: [
+      { type: "hero.choreograph", payload: { sceneCue: { recipe: "calm-intro", overrides: {} } } },
+      {
+        type: "section.choreograph",
+        payload: {
+          id: "workshop",
+          sceneCue: {
+            recipe: "cinematic",
+            overrides: {
+              atmosphere: 92,
+              atomIntensity: 1.3,
+              camera: { x: 0.05, y: -0.035, zoom: 1.12 },
+              blendMs: 1050,
+            },
+          },
+        },
+      },
+    ],
+  });
+  const result = applyBuilderBatch(session, batch);
+  assert.equal(result.ok, true);
+  assert.equal(result.session.project.page.heroSceneCue.recipe, "calm-intro");
+  const workshop = result.session.project.page.sections.find((section) => section.id === "workshop");
+  assert.equal(workshop.sceneCue.recipe, "cinematic");
+  assert.equal(workshop.sceneCue.overrides.camera.zoom, 1.12);
+});
+
+test("invalid choreography recipe rejects the whole batch", () => {
+  const session = createBuilderSession(AXM_FRONT_DOOR_PROJECT, { sessionId: "test" });
+  const result = applyBuilderBatch(session, createBuilderBatch(session, {
+    actor: { type: "ai", id: "website-ai" },
+    commands: [
+      { type: "set", payload: { path: "title", value: "Temporary" } },
+      { type: "section.choreograph", payload: { id: "why", sceneCue: { recipe: "not-real", overrides: {} } } },
+    ],
+  }));
+  assert.equal(result.ok, false);
+  assert.equal(result.session.project.title, AXM_FRONT_DOOR_PROJECT.title);
+  assert.equal(result.session.revision, 0);
 });

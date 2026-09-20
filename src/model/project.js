@@ -1,3 +1,9 @@
+import {
+  DEFAULT_SCENE_CUE,
+  normalizeSceneCue,
+  validateSceneCue,
+} from "./choreography.js";
+
 export const SURFACE_MODES = ["clear", "glass", "solid"];
 export const BACKGROUND_TYPES = ["world", "video", "image", "game"];
 export const MOTION_PROFILES = {
@@ -10,7 +16,7 @@ export const SCENE_ELEMENT_TYPES = ["orb", "ring", "beacon", "stream", "dust"];
 export const ELEMENT_MOTIONS = ["still", "drift", "float", "pulse", "orbit"];
 export const ELEMENT_TONES = ["accent", "sun", "ice", "muted"];
 export const TRANSITION_TYPES = ["none", "fade", "rise", "slide", "zoom"];
-export const CURRENT_PROJECT_VERSION = 3;
+export const CURRENT_PROJECT_VERSION = 4;
 export const PROJECT_FILE_FORMAT = "axm-animated-site-project";
 export const PROJECT_FILE_VERSION = 1;
 
@@ -21,16 +27,8 @@ export const SCENE_STATES = {
   night: { label: "Night", sky: [2, 7, 20], sun: [94, 122, 255], accent: [69, 226, 255], speed: 0.2 },
 };
 
-export const DEFAULT_TRANSITION = {
-  type: "rise",
-  duration: 650,
-  delay: 0,
-};
-
-export const DEFAULT_VISIBILITY = {
-  desktop: true,
-  mobile: true,
-};
+export const DEFAULT_TRANSITION = { type: "rise", duration: 650, delay: 0 };
+export const DEFAULT_VISIBILITY = { desktop: true, mobile: true };
 
 const DEFAULT_PAGE = {
   surface: "clear",
@@ -38,6 +36,8 @@ const DEFAULT_PAGE = {
   showNavigation: true,
   heroNote: "",
   heroTransition: { ...DEFAULT_TRANSITION, type: "fade", duration: 700 },
+  choreography: { enabled: true },
+  heroSceneCue: { ...DEFAULT_SCENE_CUE },
   navigation: [],
   sections: [],
   footer: {
@@ -88,17 +88,11 @@ export function projectSnapshot(project) {
 }
 
 function normalizeTransition(value, fallback = DEFAULT_TRANSITION) {
-  return {
-    ...fallback,
-    ...(value || {}),
-  };
+  return { ...fallback, ...(value || {}) };
 }
 
 function normalizeVisibility(value) {
-  return {
-    ...DEFAULT_VISIBILITY,
-    ...(value || {}),
-  };
+  return { ...DEFAULT_VISIBILITY, ...(value || {}) };
 }
 
 function normalizeSection(section) {
@@ -108,6 +102,7 @@ function normalizeSection(section) {
     points: Array.isArray(section?.points) ? section.points : [],
     transition: normalizeTransition(section?.transition),
     visibility: normalizeVisibility(section?.visibility),
+    sceneCue: normalizeSceneCue(section?.sceneCue),
   };
 }
 
@@ -142,10 +137,13 @@ function normalizeCurrent(project) {
     page: {
       ...structuredClone(DEFAULT_PAGE),
       ...(project.page || {}),
+      choreography: {
+        ...DEFAULT_PAGE.choreography,
+        ...(project.page?.choreography || {}),
+      },
+      heroSceneCue: normalizeSceneCue(project.page?.heroSceneCue),
       heroTransition: normalizeTransition(project.page?.heroTransition, DEFAULT_PAGE.heroTransition),
-      sections: Array.isArray(project.page?.sections)
-        ? project.page.sections.map(normalizeSection)
-        : [],
+      sections: Array.isArray(project.page?.sections) ? project.page.sections.map(normalizeSection) : [],
       navigation: Array.isArray(project.page?.navigation) ? structuredClone(project.page.navigation) : [],
       footer: {
         ...DEFAULT_PAGE.footer,
@@ -160,24 +158,17 @@ function normalizeCurrent(project) {
 }
 
 export function migrateProject(input) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new Error("HOLD_INVALID_PROJECT");
-  }
-  if (input.format !== "axm-animated-site") {
-    throw new Error("HOLD_INVALID_PROJECT");
-  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("HOLD_INVALID_PROJECT");
+  if (input.format !== "axm-animated-site") throw new Error("HOLD_INVALID_PROJECT");
 
   const sourceVersion = Number(input.version || 1);
-  if (!Number.isInteger(sourceVersion) || sourceVersion < 1) {
-    throw new Error("HOLD_INVALID_PROJECT_VERSION");
-  }
-  if (sourceVersion > CURRENT_PROJECT_VERSION) {
-    throw new Error("HOLD_PROJECT_VERSION_NEWER_THAN_BUILDER");
-  }
+  if (!Number.isInteger(sourceVersion) || sourceVersion < 1) throw new Error("HOLD_INVALID_PROJECT_VERSION");
+  if (sourceVersion > CURRENT_PROJECT_VERSION) throw new Error("HOLD_PROJECT_VERSION_NEWER_THAN_BUILDER");
 
   const migrations = [];
-  if (sourceVersion === 1) migrations.push("v1→v2", "v2→v3");
-  if (sourceVersion === 2) migrations.push("v2→v3");
+  if (sourceVersion === 1) migrations.push("v1→v2", "v2→v3", "v3→v4");
+  if (sourceVersion === 2) migrations.push("v2→v3", "v3→v4");
+  if (sourceVersion === 3) migrations.push("v3→v4");
 
   return {
     project: normalizeCurrent(structuredClone(input)),
@@ -214,14 +205,13 @@ export function validateProject(project) {
   if (!BACKGROUND_TYPES.includes(project?.background?.type)) holds.push("HOLD_UNKNOWN_BACKGROUND");
   if (!SCENE_STATES[project?.background?.state]) holds.push("HOLD_UNKNOWN_SCENE_STATE");
   if (!MOTION_PROFILES[project?.background?.motionProfile]) holds.push("HOLD_UNKNOWN_MOTION_PROFILE");
-  if (!Number.isFinite(project?.background?.motionScale) || project.background.motionScale < 0 || project.background.motionScale > 3) {
-    holds.push("HOLD_INVALID_MOTION_SCALE");
-  }
+  if (!Number.isFinite(project?.background?.motionScale) || project.background.motionScale < 0 || project.background.motionScale > 3) holds.push("HOLD_INVALID_MOTION_SCALE");
   if (!SURFACE_MODES.includes(project?.page?.surface)) holds.push("HOLD_UNKNOWN_SURFACE");
   if (!validTransition(project?.page?.heroTransition)) holds.push("HOLD_INVALID_HERO_TRANSITION");
-  if (["video", "image"].includes(project?.background?.type) && !project.background.mediaUrl) {
-    holds.push("HOLD_MEDIA_SOURCE_REQUIRED");
-  }
+  if (typeof project?.page?.choreography?.enabled !== "boolean") holds.push("HOLD_INVALID_CHOREOGRAPHY_CONFIG");
+  holds.push(...validateSceneCue(project?.page?.heroSceneCue, { sceneStates: SCENE_STATES, motionProfiles: MOTION_PROFILES }));
+
+  if (["video", "image"].includes(project?.background?.type) && !project.background.mediaUrl) holds.push("HOLD_MEDIA_SOURCE_REQUIRED");
 
   const elements = project?.background?.sceneElements;
   if (!Array.isArray(elements)) {
@@ -255,6 +245,7 @@ export function validateProject(project) {
       if (section?.points !== undefined && !Array.isArray(section.points)) holds.push("HOLD_INVALID_SECTION_POINTS");
       if (!validTransition(section?.transition)) holds.push("HOLD_INVALID_SECTION_TRANSITION");
       if (!validVisibility(section?.visibility)) holds.push("HOLD_INVALID_SECTION_VISIBILITY");
+      holds.push(...validateSceneCue(section?.sceneCue, { sceneStates: SCENE_STATES, motionProfiles: MOTION_PROFILES }));
     }
   }
 
@@ -281,7 +272,6 @@ export async function buildProjectFile(project) {
   const migrated = migrateProject(project);
   const check = validateProject(migrated.project);
   if (!check.ok) throw new Error(check.holds.join(", "));
-
   const canonicalProject = projectSnapshot(migrated.project);
   const projectSha256 = await sha256(canonicalProject);
   const envelope = {
@@ -290,7 +280,6 @@ export async function buildProjectFile(project) {
     projectSha256,
     project: migrated.project,
   };
-
   return {
     text: JSON.stringify(envelope, null, 2),
     receipt: {
@@ -314,15 +303,12 @@ export async function parseProjectFile(text, { sourceName = null } = {}) {
   if (parsed?.format === PROJECT_FILE_FORMAT) {
     if (parsed.fileVersion !== PROJECT_FILE_VERSION) throw new Error("HOLD_PROJECT_FILE_VERSION_UNSUPPORTED");
     if (!parsed.project || typeof parsed.project !== "object") throw new Error("HOLD_PROJECT_FILE_MISSING_PROJECT");
-
     const canonicalSource = projectSnapshot(parsed.project);
     const actualSha256 = await sha256(canonicalSource);
     if (parsed.projectSha256 !== actualSha256) throw new Error("HOLD_PROJECT_FILE_IDENTITY_MISMATCH");
-
     const migrated = migrateProject(parsed.project);
     const check = validateProject(migrated.project);
     if (!check.ok) throw new Error(check.holds.join(", "));
-
     return {
       project: migrated.project,
       receipt: {
@@ -340,7 +326,6 @@ export async function parseProjectFile(text, { sourceName = null } = {}) {
     const migrated = migrateProject(parsed);
     const check = validateProject(migrated.project);
     if (!check.ok) throw new Error(check.holds.join(", "));
-
     return {
       project: migrated.project,
       receipt: {

@@ -30,7 +30,7 @@ test("v1 projects migrate explicitly to the current schema", () => {
   delete legacy.page.footer;
   const result = migrateProject(legacy);
   assert.equal(result.project.version, CURRENT_PROJECT_VERSION);
-  assert.deepEqual(result.migrations, ["v1→v2", "v2→v3"]);
+  assert.deepEqual(result.migrations, ["v1→v2", "v2→v3", "v3→v4"]);
   assert.deepEqual(result.project.page.sections, []);
   assert.deepEqual(result.project.page.navigation, []);
   assert.equal(result.project.page.footer.left, "IDEAS SHAPE WORLDS");
@@ -63,7 +63,7 @@ test("raw v1 project files open with a visible migration receipt", async () => {
   delete legacy.page.navigation;
   const opened = await parseProjectFile(JSON.stringify(legacy), { sourceName: "legacy.json" });
   assert.equal(opened.project.version, CURRENT_PROJECT_VERSION);
-  assert.deepEqual(opened.receipt.migrations, ["v1→v2", "v2→v3"]);
+  assert.deepEqual(opened.receipt.migrations, ["v1→v2", "v2→v3", "v3→v4"]);
   assert.equal(opened.receipt.verified, false);
 });
 
