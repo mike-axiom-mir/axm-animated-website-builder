@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir -p review-screenshots
           npx --yes playwright@1.55.0 screenshot             --browser chromium             --viewport-size "1440,1024"             --full-page             http://127.0.0.1:4173/             review-screenshots/builder-desktop-1440x1024.png
-          npx --yes playwright@1.55.0 screenshot             --browser chromium             --device "iPhone 13"             --full-page             http://127.0.0.1:4173/             review-screenshots/builder-phone-390x844.png
+          npx --yes playwright@1.55.0 screenshot             --browser chromium             --viewport-size "390,844"             --full-page             http://127.0.0.1:4173/             review-screenshots/builder-phone-390x844.png
 
       - name: Upload visual review
         uses: actions/upload-artifact@v4
