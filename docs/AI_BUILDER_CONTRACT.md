@@ -40,6 +40,11 @@ World/motion:
 - scene.element.remove
 - scene.element.move
 
+Section choreography:
+- choreography.configure — enable/disable scroll-driven world changes
+- hero.choreograph — assign the hero world recipe
+- section.choreograph — assign a recipe + bounded overrides to a semantic section
+
 Section updates can carry transition and desktop/phone visibility. Scene elements can carry type, normalized placement, size, opacity, motion behavior, speed, phase, tone and responsive visibility.
 
 Unknown command types and unapproved set paths become explicit HOLD results.
@@ -72,3 +77,39 @@ GitHub Actions now produces separate settled visual evidence after tests/build:
 - standalone published phone
 
 Production-device performance remains a separate measurement.
+
+
+## Section choreography recipes
+
+The current reusable recipes are:
+
+- inherit — keep the base world
+- calm-intro — restrained arrival
+- product-reveal — clearer motion with a gentle camera push
+- technical — cool, measured motion
+- cinematic — slower atmospheric depth and stronger framing
+- playful — faster motion and stronger atoms
+
+A section cue stores a recipe plus optional overrides. Current overrides can change scene state, motion profile/scale, atmosphere, atom intensity, camera pan/zoom, and blend time.
+
+Example:
+
+```json
+{
+  "type": "section.choreograph",
+  "payload": {
+    "id": "workshop",
+    "sceneCue": {
+      "recipe": "cinematic",
+      "overrides": {
+        "atmosphere": 92,
+        "atomIntensity": 1.3,
+        "camera": { "x": 0.05, "y": -0.035, "zoom": 1.12 },
+        "blendMs": 1050
+      }
+    }
+  }
+}
+```
+
+The published runtime selects the semantic section nearest the viewing focus and eases toward its resolved cue. Choreography is therefore derived runtime state; it does not rewrite canonical project data while the visitor scrolls.
