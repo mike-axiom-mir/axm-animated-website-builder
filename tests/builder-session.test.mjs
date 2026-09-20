@@ -137,8 +137,9 @@ test("AI and human can update one scene element through the same contract", () =
     }],
   }));
   assert.equal(result.ok, true);
-  assert.equal(result.session.project.background.sceneElements[0].x, 0.62);
-  assert.equal(result.session.project.background.sceneElements[0].motion, "orbit");
+  const signal = result.session.project.background.sceneElements.find((element) => element.id === "signal");
+  assert.equal(signal.x, 0.62);
+  assert.equal(signal.motion, "orbit");
 });
 
 test("section transition and responsive visibility survive AI composition", () => {
