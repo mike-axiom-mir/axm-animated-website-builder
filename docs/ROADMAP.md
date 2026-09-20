@@ -4,9 +4,9 @@
 
 1. Verify and repair the current desktop/mobile editor in a real browser.
 2. Verify the exported single-file site independently of the editor.
-3. Add project save/open with schema migration and exact source identity.
-4. Add a measured WebGL adapter only after the Canvas contract is stable.
-5. Build the first AXM front-door project with the builder and feed only proven missing controls back into the builder.
+3. **Implemented candidate:** project save/open with explicit schema migration and SHA-256 source identity receipts.
+4. Feed the first real AXM front-door findings back into actual authoring controls, not render-only data.
+5. Add a measured WebGL adapter only after the Canvas contract and authoring flow are stable.
 
 ## Deliberately deferred
 

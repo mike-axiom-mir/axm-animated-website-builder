@@ -1,16 +1,70 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildStandaloneHtml } from "../src/export/exportSite.js";
-import { DEFAULT_PROJECT, updateProject, validateProject } from "../src/model/project.js";
+import {
+  CURRENT_PROJECT_VERSION,
+  DEFAULT_PROJECT,
+  buildProjectFile,
+  migrateProject,
+  parseProjectFile,
+  updateProject,
+  validateProject,
+} from "../src/model/project.js";
 import { AXM_FRONT_DOOR_PROJECT } from "../src/projects/axmFrontDoor.js";
 
 test("default project is a valid live-world composition", () => {
   assert.deepEqual(validateProject(DEFAULT_PROJECT), { ok: true, holds: [] });
+  assert.equal(DEFAULT_PROJECT.version, CURRENT_PROJECT_VERSION);
 });
 
 test("AXM front door is a valid builder project", () => {
   assert.deepEqual(validateProject(AXM_FRONT_DOOR_PROJECT), { ok: true, holds: [] });
   assert.equal(AXM_FRONT_DOOR_PROJECT.page.sections.length, 4);
+});
+
+test("v1 projects migrate explicitly to the current schema", () => {
+  const legacy = structuredClone(DEFAULT_PROJECT);
+  legacy.version = 1;
+  delete legacy.page.sections;
+  delete legacy.page.navigation;
+  delete legacy.page.footer;
+  const result = migrateProject(legacy);
+  assert.equal(result.project.version, CURRENT_PROJECT_VERSION);
+  assert.deepEqual(result.migrations, ["v1→v2"]);
+  assert.deepEqual(result.project.page.sections, []);
+  assert.deepEqual(result.project.page.navigation, []);
+  assert.equal(result.project.page.footer.left, "IDEAS SHAPE WORLDS");
+});
+
+test("project save/open verifies an exact SHA-256 identity", async () => {
+  const saved = await buildProjectFile(AXM_FRONT_DOOR_PROJECT);
+  const opened = await parseProjectFile(saved.text, { sourceName: "front-door.axm.json" });
+  assert.deepEqual(opened.project, AXM_FRONT_DOOR_PROJECT);
+  assert.equal(opened.receipt.verified, true);
+  assert.equal(opened.receipt.sha256, saved.receipt.sha256);
+  assert.equal(opened.receipt.sourceName, "front-door.axm.json");
+  assert.deepEqual(opened.receipt.migrations, []);
+});
+
+test("tampered project envelopes are held instead of silently opened", async () => {
+  const saved = await buildProjectFile(AXM_FRONT_DOOR_PROJECT);
+  const envelope = JSON.parse(saved.text);
+  envelope.project.title = "Tampered";
+  await assert.rejects(
+    () => parseProjectFile(JSON.stringify(envelope)),
+    /HOLD_PROJECT_FILE_IDENTITY_MISMATCH/,
+  );
+});
+
+test("raw v1 project files open with a visible migration receipt", async () => {
+  const legacy = structuredClone(DEFAULT_PROJECT);
+  legacy.version = 1;
+  delete legacy.page.sections;
+  delete legacy.page.navigation;
+  const opened = await parseProjectFile(JSON.stringify(legacy), { sourceName: "legacy.json" });
+  assert.equal(opened.project.version, CURRENT_PROJECT_VERSION);
+  assert.deepEqual(opened.receipt.migrations, ["v1→v2"]);
+  assert.equal(opened.receipt.verified, false);
 });
 
 test("media adapters hold until a source is bound", () => {

@@ -19,6 +19,8 @@ import {
   PanelTop,
   Play,
   RotateCcw,
+  Save,
+  FileUp,
   Settings2,
   Sparkles,
   Smartphone,
@@ -30,11 +32,14 @@ import { BackgroundRuntime } from "./runtime/WorldCanvas.jsx";
 import {
   BACKGROUND_TYPES,
   SCENE_STATES,
+  buildProjectFile,
+  parseProjectFile,
   projectSnapshot,
   updateProject,
   validateProject,
 } from "./model/project.js";
 import { downloadStandaloneSite } from "./export/exportSite.js";
+import { PageControls } from "./editor/PageControls.jsx";
 import { AXM_FRONT_DOOR_PROJECT } from "./projects/axmFrontDoor.js";
 
 const backgroundOptions = [
@@ -43,6 +48,21 @@ const backgroundOptions = [
   { id: "image", label: "Asset", icon: Image, note: "Image layer" },
   { id: "game", label: "Browser game", icon: Gamepad2, note: "Interactive canvas" },
 ];
+
+function projectFilename(project) {
+  const base = project.metadata?.projectId || project.title || "axm-animated-site";
+  const slug = String(base).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "axm-animated-site";
+  return `${slug}.axm.json`;
+}
+
+function downloadTextFile(filename, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function BrandMark() {
   return <span className="brand-mark" aria-hidden="true"><i /><b /></span>;
@@ -223,10 +243,7 @@ function SceneRail({ project, setProject, uploadRef, isOpen, onClose }) {
               <button className={project.page.surface === surface ? "is-selected" : ""} key={surface} onClick={() => set("page.surface", surface)} type="button">{surface}</button>
             ))}
           </div>
-          <SubRow label="Hero" selected dot />
-          <SubRow label={`Sections · ${project.page.sections?.length || 0}`} dot={Boolean(project.page.sections?.length)} />
-          <SubRow label="Navigation" />
-          <SubRow label="Media" />
+          <PageControls project={project} setProject={setProject} />
         </RailRow>
 
         <RailRow icon={Code2} label="Capabilities">
@@ -271,7 +288,9 @@ export function App() {
   const [railOpen, setRailOpen] = useState(false);
   const [viewport, setViewport] = useState("desktop");
   const [notice, setNotice] = useState("");
+  const [sourceReceipt, setSourceReceipt] = useState(null);
   const uploadRef = useRef(null);
+  const projectOpenRef = useRef(null);
 
   const showNotice = (message) => {
     setNotice(message);
@@ -283,6 +302,33 @@ export function App() {
       showNotice("Standalone presentation downloaded");
     } catch (error) {
       showNotice(error.message);
+    }
+  };
+  const saveProject = async () => {
+    try {
+      const saved = await buildProjectFile(project);
+      const filename = projectFilename(project);
+      downloadTextFile(filename, saved.text);
+      setSourceReceipt({ ...saved.receipt, sourceName: filename });
+      showNotice(`Project saved · ${saved.receipt.sha256.slice(0, 12)}`);
+    } catch (error) {
+      showNotice(error.message);
+    }
+  };
+  const openProject = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const opened = await parseProjectFile(await file.text(), { sourceName: file.name });
+      setProject(opened.project);
+      setInteractive(false);
+      setSourceReceipt(opened.receipt);
+      const migrationNote = opened.receipt.migrations.length ? ` · migrated ${opened.receipt.migrations.join(", ")}` : "";
+      showNotice(`Project opened · ${opened.receipt.sha256.slice(0, 12)}${migrationNote}`);
+    } catch (error) {
+      showNotice(error.message);
+    } finally {
+      event.target.value = "";
     }
   };
   const loadMedia = (event) => {
@@ -300,6 +346,7 @@ export function App() {
   const resetProject = () => {
     setProject(AXM_FRONT_DOOR_PROJECT);
     setInteractive(false);
+    setSourceReceipt(null);
     showNotice("Front door restored to its project baseline");
   };
 
@@ -338,6 +385,8 @@ export function App() {
         </button>
         <div className="topbar-actions">
           <button className="secondary-action" onClick={() => setMode("preview")} type="button"><CirclePlay size={17} /> <span>Preview site</span></button>
+          <button className="icon-button project-file-action" onClick={saveProject} aria-label="Save builder project" title="Save builder project" type="button"><Save size={17} /></button>
+          <button className="icon-button project-file-action" onClick={() => projectOpenRef.current?.click()} aria-label="Open builder project" title="Open builder project" type="button"><FileUp size={17} /></button>
           <button className="primary-action" onClick={exportSite} type="button"><Download size={17} /> <span>Export</span></button>
           <button className="icon-button reset-action" onClick={resetProject} aria-label="Reset project" title="Reset project" type="button"><RotateCcw size={17} /></button>
         </div>
@@ -348,12 +397,16 @@ export function App() {
 
       <div className={`editor-stage-wrap is-view-${viewport}`}>
         <Stage project={project} interactive={interactive} onInteractive={() => setInteractive(true)} onExit={() => setInteractive(false)} />
-        <div className="stage-status"><span className="live-dot" /> Live composition <i /> <b>{project.background.type}</b> beneath <b>{project.page.surface} page</b></div>
+        <div className="stage-status">
+          <span className="live-dot" /> Live composition <i /> <b>{project.background.type}</b> beneath <b>{project.page.surface} page</b>
+          {sourceReceipt && <><i /><span title={sourceReceipt.sha256}>source {sourceReceipt.sha256.slice(0, 8)}</span></>}
+        </div>
         <button className="bind-media" onClick={() => uploadRef.current?.click()} type="button"><Upload size={15} /> Bind local media</button>
       </div>
       <StateStrip project={project} setProject={setProject} />
 
       <input ref={uploadRef} className="visually-hidden" type="file" accept="image/*,video/*" onChange={loadMedia} />
+      <input ref={projectOpenRef} className="visually-hidden" type="file" accept=".json,.axm.json,application/json" onChange={openProject} />
       <output className={`notice${notice ? " is-visible" : ""}`}>{notice}</output>
       <script type="application/json" id="axm-project-snapshot">{projectSnapshot(project)}</script>
     </main>
