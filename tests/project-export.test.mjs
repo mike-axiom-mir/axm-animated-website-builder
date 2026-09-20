@@ -103,6 +103,10 @@ test("front-door export carries semantic sections and navigation", () => {
   assert.match(html, /signal-orb/);
   assert.match(html, /data-transition="rise"/);
   assert.match(html, /IntersectionObserver/);
+  assert.match(html, /data-scene-target="workshop"/);
+  assert.match(html, /calm-intro/);
+  assert.match(html, /cinematic/);
+  assert.match(html, /updateScene/);
   assert.doesNotMatch(html, /Scene layers/);
   const script = html.match(/<script>([\s\S]*)<\/script>/);
   assert.ok(script, "front-door runtime script is present");
