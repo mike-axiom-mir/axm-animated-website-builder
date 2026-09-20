@@ -36,6 +36,7 @@ Fresh runtime and browser evidence is recorded separately during each accepted b
 - Schema migration is explicit and reported when an older project is opened.
 - AI and human edits share one command/session contract; there is no privileged AI mutation path.
 - A stale collaboration batch is held rather than silently overwriting newer work.
+- Section choreography is derived runtime state; visitor scroll never rewrites canonical project data.
 - Reduced-motion users must not depend on entrance animation to read content.
 - Responsive visibility is explicit project state, not hidden editor state.
 - Export excludes editor code and collaboration-session history.
