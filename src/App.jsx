@@ -127,7 +127,7 @@ function PageOverlay({ project, interactive, onAction, onSceneTargetChange }) {
       let bestDistance = Infinity;
       for (const node of targets) {
         const rect = node.getBoundingClientRect();
-        const center = Math.max(rect.top, rootRect.top) + Math.min(rect.height, root.clientHeight) * 0.5;
+        const center = (rect.top + rect.bottom) * 0.5;
         const distance = Math.abs(center - focusY);
         if (distance < bestDistance) {
           best = node;
