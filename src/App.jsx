@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { BackgroundRuntime } from "./runtime/WorldCanvas.jsx";
+import { AnimatedReveal } from "./runtime/AnimatedReveal.jsx";
 import {
   BACKGROUND_TYPES,
   SCENE_STATES,
@@ -47,6 +48,7 @@ import {
 } from "./contract/builderSession.js";
 import { CollaborationPanel } from "./editor/CollaborationPanel.jsx";
 import { PageControls } from "./editor/PageControls.jsx";
+import { SceneMotionControls } from "./editor/SceneMotionControls.jsx";
 import { AXM_FRONT_DOOR_PROJECT } from "./projects/axmFrontDoor.js";
 
 const backgroundOptions = [
@@ -109,54 +111,54 @@ function PageOverlay({ project, interactive, onAction }) {
       {project.page.showNavigation && (
         <nav className="site-nav" aria-label="Published site navigation preview">
           <a className="site-brand" href="#"><BrandMark /> AXM</a>
-          <div>
-            {navigation.map((item) => <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>)}
-          </div>
+          <div>{navigation.map((item) => <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>)}</div>
         </nav>
       )}
       <section className="site-hero">
-        <div className={`hero-surface surface-${project.page.surface}`}>
+        <AnimatedReveal className={`hero-surface surface-${project.page.surface}`} transition={project.page.heroTransition}>
           <p>{project.eyebrow}</p>
           <h1>{project.title}</h1>
           {project.background.type === "game" ? (
-            <button className="hero-action" onClick={onAction} type="button">
-              <Gamepad2 size={17} /> Enter world
-            </button>
+            <button className="hero-action" onClick={onAction} type="button"><Gamepad2 size={17} /> Enter world</button>
           ) : (
-            <a className="hero-action" href={firstSection}>
-              <Play size={17} /> {project.action}
-            </a>
+            <a className="hero-action" href={firstSection}><Play size={17} /> {project.action}</a>
           )}
           {project.page.heroNote && <small className="hero-note">{project.page.heroNote}</small>}
-        </div>
+        </AnimatedReveal>
       </section>
       {sections.length > 0 && (
         <div className="site-sections">
-          {sections.map((section) => (
-            <section className={`site-section surface-${section.surface || "clear"}`} id={section.id} key={section.id}>
-              <div className="section-label"><span>{section.eyebrow}</span><i /></div>
-              <div className="section-copy">
-                <h2>{section.title}</h2>
-                <p>{section.body}</p>
-                {section.points?.length > 0 && <ul>{section.points.map((point) => <li key={point}>{point}</li>)}</ul>}
-                {section.links?.length > 0 && (
-                  <div className="section-links">
-                    {section.links.map((link) => (
-                      <a
-                        className="section-link"
-                        href={link.href}
-                        key={`${link.href}-${link.label}`}
-                        target={link.href.startsWith("http") ? "_blank" : undefined}
-                        rel={link.href.startsWith("http") ? "noreferrer" : undefined}
-                      >
-                        {link.label} <span aria-hidden="true">↗</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-          ))}
+          {sections.map((section) => {
+            const visibility = [
+              section.visibility?.desktop === false ? " section-desktop-off" : "",
+              section.visibility?.mobile === false ? " section-mobile-off" : "",
+            ].join("");
+            return (
+              <AnimatedReveal
+                as="section"
+                className={`site-section surface-${section.surface || "clear"}${visibility}`}
+                id={section.id}
+                key={section.id}
+                transition={section.transition}
+              >
+                <div className="section-label"><span>{section.eyebrow}</span><i /></div>
+                <div className="section-copy">
+                  <h2>{section.title}</h2>
+                  <p>{section.body}</p>
+                  {section.points?.length > 0 && <ul>{section.points.map((point) => <li key={point}>{point}</li>)}</ul>}
+                  {section.links?.length > 0 && (
+                    <div className="section-links">
+                      {section.links.map((link) => (
+                        <a className="section-link" href={link.href} key={`${link.href}-${link.label}`} target={link.href.startsWith("http") ? "_blank" : undefined} rel={link.href.startsWith("http") ? "noreferrer" : undefined}>
+                          {link.label} <span aria-hidden="true">↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </AnimatedReveal>
+            );
+          })}
         </div>
       )}
       <footer className="site-footer">
@@ -236,6 +238,10 @@ function SceneRail({ project, session, dispatchHuman, onApplyAiBatch, onExportSe
           <SubRow label="Sky gradient" />
           <SubRow label="Fog planes" />
           <SubRow label="Live lighting" />
+        </RailRow>
+
+        <RailRow icon={Sparkles} label="Motion fabric">
+          <SceneMotionControls project={project} dispatch={dispatchHuman} />
         </RailRow>
 
         <RailRow icon={Aperture} label="Camera">

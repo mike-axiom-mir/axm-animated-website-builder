@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { SCENE_STATES } from "../model/project.js";
+import { MOTION_PROFILES, SCENE_STATES } from "../model/project.js";
 
 function polygon(ctx, points, fill, stroke) {
   ctx.beginPath();
@@ -19,9 +19,112 @@ function seeded(seed, index) {
   return x - Math.floor(x);
 }
 
+function toneRgb(element, state) {
+  if (element.tone === "sun") return state.sun;
+  if (element.tone === "ice") return [205, 246, 255];
+  if (element.tone === "muted") return [112, 148, 160];
+  return state.accent;
+}
+
+function drawSceneElement(ctx, width, height, time, project, state, element, index) {
+  const mobile = width <= 720;
+  if (mobile && element.visibility?.mobile === false) return;
+  if (!mobile && element.visibility?.desktop === false) return;
+
+  const profile = MOTION_PROFILES[project.background.motionProfile] || MOTION_PROFILES.drift;
+  const activeTime = project.background.motion
+    ? time * profile.speed * project.background.motionScale * element.speed
+    : 0;
+  const phase = element.phase || 0;
+  let radius = Math.max(5, Math.min(width, height) * element.size);
+  let x = element.x * width;
+  let y = element.y * height;
+
+  if (element.motion === "drift") {
+    x = ((x + activeTime * radius * 1.25 + width + radius) % (width + radius * 2)) - radius;
+  } else if (element.motion === "float") {
+    y += Math.sin(activeTime + phase) * radius * 0.55;
+  } else if (element.motion === "pulse") {
+    radius *= 1 + Math.sin(activeTime * 1.6 + phase) * 0.22;
+  } else if (element.motion === "orbit") {
+    x += Math.cos(activeTime + phase) * radius * 0.7;
+    y += Math.sin(activeTime + phase) * radius * 0.7;
+  }
+
+  const [r, g, b] = toneRgb(element, state);
+  const alpha = element.opacity;
+  ctx.save();
+
+  if (element.type === "orb") {
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.8);
+    glow.addColorStop(0, `rgba(${r},${g},${b},${Math.min(alpha, 1)})`);
+    glow.addColorStop(0.28, `rgba(${r},${g},${b},${alpha * 0.38})`);
+    glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (element.type === "ring") {
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.lineWidth = Math.max(1, radius * 0.08);
+    ctx.shadowColor = `rgba(${r},${g},${b},${alpha})`;
+    ctx.shadowBlur = radius * 0.4;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (element.type === "beacon") {
+    const beam = ctx.createLinearGradient(x, y - radius * 3, x, y + radius * 3);
+    beam.addColorStop(0, `rgba(${r},${g},${b},0)`);
+    beam.addColorStop(0.5, `rgba(${r},${g},${b},${alpha * 0.75})`);
+    beam.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx.strokeStyle = beam;
+    ctx.lineWidth = Math.max(1, radius * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(x, y - radius * 3);
+    ctx.lineTo(x, y + radius * 3);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(2, radius * 0.15), 0, Math.PI * 2);
+    ctx.fill();
+  } else if (element.type === "stream") {
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.lineWidth = Math.max(1, radius * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(x - radius * 2.2, y);
+    ctx.bezierCurveTo(
+      x - radius,
+      y - radius * (0.4 + Math.sin(activeTime + phase) * 0.3),
+      x + radius,
+      y + radius * (0.4 + Math.cos(activeTime + phase) * 0.3),
+      x + radius * 2.2,
+      y,
+    );
+    ctx.stroke();
+  } else if (element.type === "dust") {
+    for (let particle = 0; particle < 16; particle += 1) {
+      const angle = seeded(project.background.seed + index, particle) * Math.PI * 2;
+      const distance = seeded(project.background.seed + index + 9, particle) * radius * 2.3;
+      const drift = Math.sin(activeTime + phase + particle) * radius * 0.2;
+      const px = x + Math.cos(angle) * distance + drift;
+      const py = y + Math.sin(angle) * distance + Math.cos(activeTime + particle) * radius * 0.15;
+      const particleAlpha = alpha * (0.25 + seeded(index + 5, particle) * 0.65);
+      ctx.fillStyle = `rgba(${r},${g},${b},${particleAlpha})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1 + seeded(index + 2, particle) * 2.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
 function drawWorld(ctx, width, height, time, project, keys) {
   const state = SCENE_STATES[project.background.state] || SCENE_STATES.idle;
-  const motion = project.background.motion ? time * state.speed : 0;
+  const profile = MOTION_PROFILES[project.background.motionProfile] || MOTION_PROFILES.drift;
+  const motion = project.background.motion
+    ? time * state.speed * profile.speed * project.background.motionScale
+    : 0;
   const [sr, sg, sb] = state.sky;
   const [ar, ag, ab] = state.accent;
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
@@ -92,6 +195,10 @@ function drawWorld(ctx, width, height, time, project, keys) {
     ctx.fillRect(x - 31, y + 1, 8, 3);
   }
 
+  for (const [index, element] of project.background.sceneElements.entries()) {
+    drawSceneElement(ctx, width, height, time, project, state, element, index);
+  }
+
   if (project.background.type === "game") {
     const dx = (keys.current.ArrowRight ? 1 : 0) - (keys.current.ArrowLeft ? 1 : 0);
     const dy = (keys.current.ArrowDown ? 1 : 0) - (keys.current.ArrowUp ? 1 : 0);
@@ -105,6 +212,9 @@ function drawWorld(ctx, width, height, time, project, keys) {
     ctx.shadowBlur = 0;
   }
 
+  const atmosphere = project.background.atmosphere / 100;
+  ctx.fillStyle = `rgba(18,48,60,${0.015 + atmosphere * 0.055})`;
+  ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.fillRect(0, 0, width, height);
 }
@@ -149,16 +259,12 @@ export function WorldCanvas({ project, interactive }) {
     };
   }, [project, interactive]);
 
-  return <canvas className="world-canvas" ref={canvasRef} aria-label="Live low-poly animated world" />;
+  return <canvas className="world-canvas" ref={canvasRef} aria-label="Live animated world with reusable scene elements" />;
 }
 
 export function BackgroundRuntime({ project, interactive }) {
   const { type, mediaUrl } = project.background;
-  if (type === "video" && mediaUrl) {
-    return <video className="background-media" src={mediaUrl} autoPlay loop muted playsInline />;
-  }
-  if (type === "image" && mediaUrl) {
-    return <img className="background-media" src={mediaUrl} alt="Uploaded background asset" />;
-  }
+  if (type === "video" && mediaUrl) return <video className="background-media" src={mediaUrl} autoPlay loop muted playsInline />;
+  if (type === "image" && mediaUrl) return <img className="background-media" src={mediaUrl} alt="Uploaded background asset" />;
   return <WorldCanvas project={project} interactive={interactive} />;
 }

@@ -100,6 +100,9 @@ test("front-door export carries semantic sections and navigation", () => {
   assert.match(html, /id="roots"/);
   assert.match(html, /href="#why"/);
   assert.match(html, /Explore the work on GitHub/);
+  assert.match(html, /signal-orb/);
+  assert.match(html, /data-transition="rise"/);
+  assert.match(html, /IntersectionObserver/);
   assert.doesNotMatch(html, /Scene layers/);
   const script = html.match(/<script>([\s\S]*)<\/script>/);
   assert.ok(script, "front-door runtime script is present");

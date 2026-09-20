@@ -1,5 +1,10 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { SURFACE_MODES } from "../model/project.js";
+import {
+  DEFAULT_TRANSITION,
+  DEFAULT_VISIBILITY,
+  SURFACE_MODES,
+  TRANSITION_TYPES,
+} from "../model/project.js";
 
 function uniqueSectionId(sections) {
   let number = sections.length + 1;
@@ -14,6 +19,27 @@ function uniqueSectionId(sections) {
 
 function Field({ label, children }) {
   return <label className="content-field"><span>{label}</span>{children}</label>;
+}
+
+function TransitionControls({ transition, onChange }) {
+  return (
+    <div className="transition-controls">
+      <label>
+        <span>Entrance</span>
+        <select value={transition.type} onChange={(event) => onChange({ ...transition, type: event.target.value })}>
+          {TRANSITION_TYPES.map((type) => <option value={type} key={type}>{type}</option>)}
+        </select>
+      </label>
+      <label>
+        <span>Duration <b>{transition.duration}ms</b></span>
+        <input type="range" min="0" max="1800" step="50" value={transition.duration} onChange={(event) => onChange({ ...transition, duration: Number(event.target.value) })} />
+      </label>
+      <label>
+        <span>Delay <b>{transition.delay}ms</b></span>
+        <input type="range" min="0" max="1000" step="50" value={transition.delay} onChange={(event) => onChange({ ...transition, delay: Number(event.target.value) })} />
+      </label>
+    </div>
+  );
 }
 
 export function PageControls({ project, dispatch }) {
@@ -38,6 +64,8 @@ export function PageControls({ project, dispatch }) {
             body: "Describe what this part of the site should communicate.",
             surface: "glass",
             points: [],
+            transition: { ...DEFAULT_TRANSITION },
+            visibility: { ...DEFAULT_VISIBILITY },
           },
         },
       },
@@ -48,25 +76,11 @@ export function PageControls({ project, dispatch }) {
     ], "Add section");
   };
 
-  const removeSection = (id) => dispatch([
-    { type: "section.remove", payload: { id } },
-  ], "Remove section");
-
-  const moveSection = (id, toIndex) => dispatch([
-    { type: "section.move", payload: { id, toIndex } },
-  ], "Move section");
-
-  const updateNavigation = (index, patch) => dispatch([
-    { type: "navigation.update", payload: { index, patch } },
-  ], "Edit navigation");
-
-  const addNavigation = () => dispatch([
-    { type: "navigation.add", payload: { item: { label: "Link", href: "#" } } },
-  ], "Add navigation");
-
-  const removeNavigation = (index) => dispatch([
-    { type: "navigation.remove", payload: { index } },
-  ], "Remove navigation");
+  const removeSection = (id) => dispatch([{ type: "section.remove", payload: { id } }], "Remove section");
+  const moveSection = (id, toIndex) => dispatch([{ type: "section.move", payload: { id, toIndex } }], "Move section");
+  const updateNavigation = (index, patch) => dispatch([{ type: "navigation.update", payload: { index, patch } }], "Edit navigation");
+  const addNavigation = () => dispatch([{ type: "navigation.add", payload: { item: { label: "Link", href: "#" } } }], "Add navigation");
+  const removeNavigation = (index) => dispatch([{ type: "navigation.remove", payload: { index } }], "Remove navigation");
 
   return (
     <div className="content-editor">
@@ -76,6 +90,10 @@ export function PageControls({ project, dispatch }) {
         <Field label="Title"><textarea rows="2" value={project.title} onChange={(event) => set("title", event.target.value, "Edit hero title")} /></Field>
         <Field label="Action"><input value={project.action} onChange={(event) => set("action", event.target.value, "Edit hero action")} /></Field>
         <Field label="Hero note"><textarea rows="3" value={project.page.heroNote || ""} onChange={(event) => set("page.heroNote", event.target.value, "Edit hero note")} /></Field>
+        <TransitionControls
+          transition={project.page.heroTransition}
+          onChange={(transition) => dispatch([{ type: "hero.configure", payload: { transition } }], "Edit hero entrance")}
+        />
       </div>
 
       <div className="content-editor-group">
@@ -98,25 +116,21 @@ export function PageControls({ project, dispatch }) {
             <Field label="Title"><textarea rows="2" value={section.title || ""} onChange={(event) => updateSection(section.id, { title: event.target.value }, "Edit section title")} /></Field>
             <Field label="Body"><textarea rows="4" value={section.body || ""} onChange={(event) => updateSection(section.id, { body: event.target.value }, "Edit section body")} /></Field>
             <Field label="Points · one per line">
-              <textarea
-                rows="4"
-                value={(section.points || []).join("\n")}
-                onChange={(event) => updateSection(section.id, {
-                  points: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
-                }, "Edit section points")}
-              />
+              <textarea rows="4" value={(section.points || []).join("\n")} onChange={(event) => updateSection(section.id, {
+                points: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
+              }, "Edit section points")} />
             </Field>
             <div className="mini-surface-switch" aria-label={`Surface for ${section.id}`}>
               {SURFACE_MODES.map((surface) => (
-                <button
-                  className={(section.surface || "clear") === surface ? "is-selected" : ""}
-                  key={surface}
-                  onClick={() => updateSection(section.id, { surface }, "Set section surface")}
-                  type="button"
-                >
+                <button className={(section.surface || "clear") === surface ? "is-selected" : ""} key={surface} onClick={() => updateSection(section.id, { surface }, "Set section surface")} type="button">
                   {surface}
                 </button>
               ))}
+            </div>
+            <TransitionControls transition={section.transition} onChange={(transition) => updateSection(section.id, { transition }, "Edit section entrance")} />
+            <div className="responsive-toggles">
+              <label><input type="checkbox" checked={section.visibility.desktop} onChange={(event) => updateSection(section.id, { visibility: { ...section.visibility, desktop: event.target.checked } }, "Set section desktop visibility")} /> Desktop</label>
+              <label><input type="checkbox" checked={section.visibility.mobile} onChange={(event) => updateSection(section.id, { visibility: { ...section.visibility, mobile: event.target.checked } }, "Set section phone visibility")} /> Phone</label>
             </div>
           </article>
         ))}
@@ -128,11 +142,7 @@ export function PageControls({ project, dispatch }) {
           <button type="button" onClick={addNavigation} title="Add navigation item" aria-label="Add navigation item"><Plus size={14} /></button>
         </div>
         <label className="content-toggle">
-          <input
-            checked={project.page.showNavigation}
-            onChange={(event) => set("page.showNavigation", event.target.checked, "Toggle navigation")}
-            type="checkbox"
-          />
+          <input checked={project.page.showNavigation} onChange={(event) => set("page.showNavigation", event.target.checked, "Toggle navigation")} type="checkbox" />
           <span>Show navigation</span>
         </label>
         {navigation.map((item, index) => (
