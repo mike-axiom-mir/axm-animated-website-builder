@@ -2,89 +2,99 @@
 
 Recorded: 2026-09-20
 
-## Current builder candidate identity
+## Current candidate identity
 
-- Draft PR: `mike-axiom-mir/axm-animated-website-builder#1`
-- Remote review branch: `world-stage-builder-v0`
-- Latest builder executable head: `c96ea779e8cf097bc8f9ca300aa6c30595c98028`
-- Latest builder verification: GitHub Actions run `35482189242` — success.
-- Original browser-verified Canvas/runtime head: `d3ea03a11345b36b39ab44cdd5f1c6e94640d088`.
+- Draft PR: mike-axiom-mir/axm-animated-website-builder#1
+- Remote review branch: world-stage-builder-v0
+- Motion-fabric executable code head: 779bb3d0fbae17d3d77616b2b41884e0b9ac9f29
+- Visual-evidence workflow head: 05ae6270834a8e08b07a01f7a322c3cd9acbe5a8
+- GitHub Actions verification: run 35483079926 — success.
+- Original early Canvas/runtime browser head: d3ea03a11345b36b39ab44cdd5f1c6e94640d088.
 
-The original runtime visual evidence remains valid for that exact historical head. Newer executable heads are tracked separately rather than pretending old screenshots verify new code.
+The evidence workflow head changes CI only; the application code under test is the motion-fabric executable parent.
 
-## Implemented in the current builder candidate
+## Implemented builder capabilities
 
-- World Stage editor shell.
 - Layered background/page composition.
-- Procedural Canvas 2D world and interactive game variation.
+- Procedural Canvas 2D/2.5D world and interactive game variation.
 - Image and video binding.
 - Clear, glass, and solid page surfaces.
-- Four scene states.
-- Desktop and 390 × 844 phone review canvases.
-- Published-runtime preview.
-- Standalone one-file HTML generation without the editor.
-- Semantic hero authoring.
+- Reusable scene atoms: orb, ring, beacon, stream, dust.
+- Atom motion behaviors: still, drift, float, pulse, orbit.
+- Motion profiles: still, calm, drift, kinetic.
+- Bounded global motion scale.
+- Atom tone, opacity, normalized placement, size, speed and phase.
+- Desktop/phone atom visibility.
+- Hero and section entrance transitions: none, fade, rise, slide, zoom.
+- Bounded transition duration and delay.
+- Desktop/phone section visibility.
+- Reduced-motion readable fallback.
+- Semantic hero/section/navigation/footer authoring.
 - Section add/edit/reorder/remove controls.
-- Per-section surface controls.
-- Navigation authoring.
-- Footer authoring.
-- Portable `.axm.json` builder project save/open.
-- Project schema versioning and explicit `v1→v2` migration.
-- SHA-256 source identity verification for saved project envelopes.
-- Visible source receipts in the editor after save/open.
+- Portable .axm.json save/open.
+- Project schema v3 with explicit migration receipts.
+- SHA-256 source identity verification.
+- Shared revisioned AI+human editing session.
+- Headless AI CLI over the same reducer.
+- Standalone one-file HTML generation without editor code.
 
-## Unified AI + human builder session — 2026-09-20
+## Shared AI + human contract
 
-- `src/contract/builderSession.js` is now the single mutation contract for AI and human editing.
-- AI command batches are serializable, revision-bound, and atomic.
-- Human editor controls emit the same command types instead of mutating project state through a separate path.
-- A stale AI batch receives `HOLD_SESSION_REVISION_CONFLICT` instead of overwriting newer human work.
-- The browser exposes a Shared session panel with AI batch intake, revision display, recent actor log, and session-context export.
-- `scripts/apply-builder-batch.mjs` gives agents a headless CLI path over the same reducer.
-- `npm run builder:apply -- input.axm.json ai-batch.json output.axm.json` opens a verified project, applies the AI batch, and writes a new verified project.
-- Session history remains editor/session state and is excluded from standalone website output.
+src/contract/builderSession.js remains the single mutation contract.
 
-## Fresh builder-first evidence
+New motion commands:
+- motion.configure
+- scene.compose
+- scene.element.add
+- scene.element.update
+- scene.element.remove
+- scene.element.move
 
-On executable head `c96ea779e8cf097bc8f9ca300aa6c30595c98028`:
+Human motion controls emit these same commands. AI does not have a hidden mutation path.
 
-- `npm test`: 19 project/model/session/AI-CLI tests passed.
-- Project-file round trip is covered.
-- Tampered project envelopes are rejected by SHA-256 mismatch.
-- Raw v1 projects migrate with an explicit migration receipt.
-- `npm run build`: passed.
-- `npm run test:sites`: passed.
-- AI CLI verified a real input-project → AI batch → output-project round trip.
-- GitHub Actions `Verify builder`, run `35482189242`: completed successfully.
-- GitHub Actions generated fresh desktop + phone screenshots and uploaded `builder-visual-review`.
+## Schema v3
 
-## Earlier runtime/browser evidence
+The v2→v3 migration adds motion profile/scale, scene elements, hero transition, section transitions, and explicit desktop/phone visibility. A v1 source reports v1→v2 followed by v2→v3.
 
-- Exact-head editor opened over HTTPS at desktop and phone canvas sizes on the earlier browser-verified candidate.
-- Game handoff was observed as `stage` → `stage is-interactive` → `stage`; page-owned return restored control.
-- Clear and glass surfaces and multiple scene states were observed.
-- Standalone `preview/published.html` opened independently with a live Canvas world.
-- No application error was attributed to the final editor/standalone page in that evidence pass.
-- Visual comparison is recorded in [`design-qa.md`](design-qa.md).
+## Fresh evidence
+
+GitHub Actions run 35483079926 passed on the visual-evidence head.
+
+- npm test: 21 project/model/session/motion/AI-CLI tests passed.
+- npm run build: passed.
+- npm run test:sites: 4/4 passed.
+- Standalone front-door review HTML generated from canonical state.
+- Settled builder desktop screenshot captured.
+- Settled builder phone screenshot captured.
+- Settled standalone published desktop screenshot captured.
+- Settled standalone published phone screenshot captured.
+- builder-visual-review artifact uploaded successfully.
+
+Observed in the settled screenshots:
+- motion atoms render in builder and standalone output;
+- the desktop-only ring is present on desktop and omitted on phone;
+- hero entrance settles to full readable content before visual evidence;
+- phone export remains readable and does not depend on desktop navigation.
+
+These screenshots are rendering evidence, not user visual acceptance or production-device performance evidence.
 
 ## Failures retained in history
 
-1. The first self-contained editor preview treated `$` sequences in the JavaScript bundle as replacement tokens and exposed source text. Commit `98667957e3b3b9bb0db14c62d655c7619459455b` repaired the generator.
-2. The first standalone example contained one extra closing brace. Browser evidence showed a page-level `SyntaxError`; head `d3ea03a11345b36b39ab44cdd5f1c6e94640d088` removed it and added a parse regression test.
+1. Self-contained preview initially treated dollar sequences in the JS bundle as replacement tokens; commit 98667957e3b3b9bb0db14c62d655c7619459455b repaired it.
+2. The first standalone example contained an extra closing brace; head d3ea03a11345b36b39ab44cdd5f1c6e94640d088 repaired it and added a parse regression test.
+3. Motion-schema run 35482779678 failed because the existing AXM front-door example lacked newly required v3 section transition/visibility fields. Commit 5bfe54013b978cd7b44a78fb97d43b3df03dc696 made the example canonical instead of weakening validation.
+4. Motion-render run 35482959033 failed because a test assumed a new scene atom would occupy array index 0 after the front door gained existing atoms. Commit 779bb3d0fbae17d3d77616b2b41884e0b9ac9f29 repaired the test to assert by stable element ID.
 
-## First real AXM front-door continuation
+## Product boundary
 
-- Front-door project: `src/projects/axmFrontDoor.js`.
-- Real use exposed semantic sections/navigation and per-section surfaces.
-- Those findings have now been fed back into actual builder authoring controls instead of remaining render-only data.
-- The front door remains downstream of the builder: it is one project, not a special-case engine path.
-- MorphTile remains a reusable pattern/source boundary; its engine is not embedded here.
+The first AXM front door remains one project made with this builder.
+
+MorphTile patterns remain reusable, but the MorphTile engine is not embedded here. This motion fabric is intentionally a website-animation vocabulary, not a universal graphics/game engine.
 
 ## Honest holds
 
 - PR #1 remains draft and unmerged.
-- Fresh browser visual verification of the new authoring controls is still open.
-- The scene remains Canvas 2D/2.5D, not full 3D or WebGL.
-- Image/video adapters are structurally implemented, but representative media files still lack visual acceptance.
+- Canvas output remains 2D/2.5D, not WebGL/3D.
+- Representative image/video adapters still lack dedicated visual acceptance.
 - Production-device performance remains unmeasured.
-- The AXM front-door continuation still lacks fresh user visual acceptance.
+- Latest motion-fabric visuals have rendering proof but not user visual acceptance.

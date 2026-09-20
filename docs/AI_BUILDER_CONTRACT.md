@@ -2,120 +2,73 @@
 
 ## Goal
 
-The Animated Website Builder is callable without giving AI a private or privileged editor path.
-
-AI, human controls, and mixed human+AI sessions all mutate the same canonical project through the same deterministic command contract.
+The Animated Website Builder is callable without giving AI a private or privileged editor path. AI, human controls, and mixed sessions all mutate the same canonical project through one deterministic contract.
 
 ## Command batch
 
-An AI submits a serializable batch:
+Required fields:
+- format: axm-builder-command-batch
+- version: 1
+- baseRevision: current session revision
+- actor.type: ai for AI batches
+- actor.id: caller identity
+- label: human-readable purpose
+- commands: atomic command array
 
-```json
-{
-  "format": "axm-builder-command-batch",
-  "version": 1,
-  "baseRevision": 0,
-  "actor": {
-    "type": "ai",
-    "id": "website-designer"
-  },
-  "label": "Create landing page",
-  "commands": []
-}
-```
-
-`baseRevision` is mandatory. If the human has edited revision 0 into revision 1 before the AI batch lands, the AI batch receives `HOLD_SESSION_REVISION_CONFLICT` instead of overwriting the human.
-
-A batch is atomic: either every command produces a valid project or none of the commands land.
+A stale baseRevision receives HOLD_SESSION_REVISION_CONFLICT instead of overwriting newer work. A batch is atomic: either every command produces a valid canonical project or none land.
 
 ## Current commands
 
-- `set` — bounded scalar/project fields.
-- `background.configure` — scene type/state/seed/motion/atmosphere/media source.
-- `hero.configure` — hero copy and surface.
-- `section.add`
-- `section.update`
-- `section.remove`
-- `section.move`
-- `navigation.add`
-- `navigation.update`
-- `navigation.remove`
-- `page.compose` — efficient whole semantic-page composition for AI.
+Semantic/page:
+- set
+- hero.configure
+- section.add
+- section.update
+- section.remove
+- section.move
+- navigation.add
+- navigation.update
+- navigation.remove
+- page.compose
 
-Unknown command types and unapproved `set` paths become explicit HOLD results.
+World/motion:
+- background.configure
+- motion.configure
+- scene.compose
+- scene.element.add
+- scene.element.update
+- scene.element.remove
+- scene.element.move
 
-## AI-friendly whole page example
+Section updates can carry transition and desktop/phone visibility. Scene elements can carry type, normalized placement, size, opacity, motion behavior, speed, phase, tone and responsive visibility.
 
-```json
-{
-  "format": "axm-builder-command-batch",
-  "version": 1,
-  "baseRevision": 0,
-  "actor": { "type": "ai", "id": "website-designer" },
-  "label": "First composition",
-  "commands": [
-    {
-      "type": "background.configure",
-      "payload": {
-        "state": "explore",
-        "seed": 44,
-        "motion": true,
-        "atmosphere": 80
-      }
-    },
-    {
-      "type": "page.compose",
-      "payload": {
-        "hero": {
-          "eyebrow": "LIVING WEBSITE",
-          "title": "A site composed as state, not a screenshot.",
-          "action": "Explore",
-          "surface": "clear"
-        },
-        "navigation": [
-          { "label": "Why", "href": "#why" }
-        ],
-        "sections": [
-          {
-            "id": "why",
-            "eyebrow": "WHY",
-            "title": "Animation stays behind readable content.",
-            "body": "The AI can shape the world and semantic page without taking ownership of navigation or accessibility.",
-            "surface": "glass",
-            "points": ["Portable state", "Inspectable commands"]
-          }
-        ],
-        "footer": {
-          "left": "HUMAN + AI",
-          "right": "ONE BUILDER CONTRACT"
-        }
-      }
-    }
-  ]
-}
-```
+Unknown command types and unapproved set paths become explicit HOLD results.
 
-## CLI use
+## Headless CLI
 
-An agent with filesystem access can apply a batch without opening the human UI:
+Command:
 
-```bash
 npm run builder:apply -- input.axm.json ai-batch.json output.axm.json
-```
 
-The CLI opens and verifies the input project, creates a builder session, applies the exact same batch reducer used by the browser, and writes a new verified `.axm.json` project.
+The CLI opens and verifies the input project, creates a builder session, applies the exact same reducer used by the browser, and writes a new verified .axm.json project.
 
 ## Shared browser session
-
-The editor contains a Shared session panel.
 
 - Human controls emit human command batches.
 - AI JSON can be pasted into the same session.
 - Both increment one shared revision.
-- The recent action log records actor type, revision and batch label.
-- The session context can be exported for an AI.
-- The collaboration log is session state only; it is not bundled into the published website.
+- Recent history records actor type, revision and batch label.
+- Session context can be exported for another AI.
+- Collaboration history is not bundled into the published website.
 
 ## Truth boundary
 
-A successfully applied AI batch proves deterministic state mutation. It does **not** prove visual quality. Screenshot/runtime acceptance remains a separate evidence step.
+A successfully applied AI batch proves deterministic state mutation. It does not prove visual quality.
+
+GitHub Actions now produces separate settled visual evidence after tests/build:
+- builder desktop
+- builder phone
+- standalone published desktop
+- standalone published phone
+
+Production-device performance remains a separate measurement.

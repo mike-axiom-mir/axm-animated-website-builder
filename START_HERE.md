@@ -7,25 +7,25 @@ The AXM Animated Website Builder composes two independent frontend layers:
 1. a background runtime that can animate or run continuously; and
 2. a semantic HTML page that remains readable, accessible, and able to cover the runtime where appropriate.
 
-The builder is its own product boundary. The first AXM front-door website now exists as one project made with it; that project is an acceptance case, not the definition of the builder.
+The builder is its own product boundary. The first AXM front-door website exists as one project made with it; that project is an acceptance case, not the definition of the builder.
 
 ## Current verified scope
 
-Source code currently implements a procedural Canvas 2D world, a tiny game mode, local image/video binding, semantic hero/section/navigation authoring, clear/glass/solid surface switching, scene states, runtime preview, verified project save/open, schema migration, a shared revisioned AI+human editing session, a headless AI command CLI, and standalone HTML generation.
+Source code currently implements a procedural Canvas 2D/2.5D world, image/video/game adapters, reusable animated scene atoms, global motion profiles, desktop/phone visibility, semantic page authoring, per-section entrance transitions, runtime preview, verified project save/open, schema migration, a shared revisioned AI+human session, a headless AI CLI, and standalone HTML generation.
 
-Do not describe Canvas 2D output as full 3D or WebGL.
+Do not describe Canvas 2D/2.5D output as full 3D or WebGL.
 
 Fresh runtime and browser evidence is recorded separately during each accepted build. Source existence alone is not visual proof.
 
 ## Read next
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — layer, project-state, and adapter boundaries.
-- [`docs/PROJECT_FILES.md`](docs/PROJECT_FILES.md) — portable builder project envelopes and source identity.
-- [`docs/AI_BUILDER_CONTRACT.md`](docs/AI_BUILDER_CONTRACT.md) — AI command batches, shared sessions, and headless CLI use.
-- [`docs/RUNTIME_CONTRACT.md`](docs/RUNTIME_CONTRACT.md) — rules every background type must follow.
-- [`docs/MORPHTILE_BOUNDARY.md`](docs/MORPHTILE_BOUNDARY.md) — what is reused and what remains separate.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — convergence-only next work.
-- [`PROJECT_STATE.md`](PROJECT_STATE.md) — exact current status and holds.
+- docs/ARCHITECTURE.md — layer, project-state, motion, and adapter boundaries.
+- docs/PROJECT_FILES.md — portable builder project envelopes and source identity.
+- docs/AI_BUILDER_CONTRACT.md — AI commands, motion commands, shared sessions, and CLI use.
+- docs/RUNTIME_CONTRACT.md — rules every background type must follow.
+- docs/MORPHTILE_BOUNDARY.md — what is reused and what remains separate.
+- docs/ROADMAP.md — convergence-only next work.
+- PROJECT_STATE.md — exact current status and holds.
 
 ## Non-negotiable behavior
 
@@ -36,5 +36,7 @@ Fresh runtime and browser evidence is recorded separately during each accepted b
 - Schema migration is explicit and reported when an older project is opened.
 - AI and human edits share one command/session contract; there is no privileged AI mutation path.
 - A stale collaboration batch is held rather than silently overwriting newer work.
+- Reduced-motion users must not depend on entrance animation to read content.
+- Responsive visibility is explicit project state, not hidden editor state.
 - Export excludes editor code and collaboration-session history.
-- Adding an adapter must not require rewriting the page layer.
+- Adding an adapter must not require rewriting the semantic page layer.

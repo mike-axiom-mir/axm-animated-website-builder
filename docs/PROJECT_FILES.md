@@ -4,57 +4,44 @@
 
 A builder project must be portable without making file loading a silent trust boundary.
 
-The current project-file format is:
+Current format:
+- envelope: axm-animated-site-project
+- envelope version: 1
+- project schema: 3
+- identity: SHA-256 over canonical serialized project
+- file suffix: .axm.json
 
-- envelope format: `axm-animated-site-project`;
-- envelope version: `1`;
-- current project schema: `2`; and
-- content identity: SHA-256 over the canonical serialized project.
+## Save and open
 
-Files are downloaded with the `.axm.json` suffix.
+buildProjectFile first migrates and normalizes into the active schema, validates the project, serializes it canonically, and computes the SHA-256 identity.
 
-## Save path
+parseProjectFile rejects malformed JSON, unknown envelope formats, unsupported envelope versions, identity mismatches, and newer-than-supported schemas. Supported older schemas migrate explicitly and validation runs again after migration.
 
-`buildProjectFile(project)` first migrates/normalizes the current project into the active schema, validates it, serializes it canonically, and computes the SHA-256 identity.
-
-The saved envelope contains:
-
-```json
-{
-  "format": "axm-animated-site-project",
-  "fileVersion": 1,
-  "projectSha256": "...",
-  "project": {}
-}
-```
-
-## Open path
-
-`parseProjectFile(text, { sourceName })` follows these rules:
-
-1. malformed JSON is a HOLD;
-2. unknown envelope formats are a HOLD;
-3. unsupported envelope versions are a HOLD;
-4. the stored SHA-256 must match the contained project before migration;
-5. newer-than-supported project schemas are a HOLD;
-6. supported older schemas migrate explicitly; and
-7. validation runs again after migration.
-
-The returned receipt records the SHA-256, source name, source schema version, whether the envelope identity was verified, and any migrations.
+The returned receipt records SHA-256, source name, source schema version, whether the envelope identity was verified, and every migration that occurred.
 
 ## Legacy raw project JSON
 
-Raw `axm-animated-site` JSON can still be opened for migration. Because it has no saved envelope identity, the receipt is marked `verified: false` even though the builder computes a SHA-256 for that source text representation.
+Raw axm-animated-site JSON can still be opened for migration. Because it has no saved envelope identity, the receipt is marked verified: false. This compatibility path is not equivalent evidence to a verified envelope.
 
-This is compatibility, not equivalent evidence to a verified envelope.
+## Migrations
 
-## Current migration
+### v1 → v2
 
-Schema `v1 → v2` adds the semantic-page defaults required by real builder use:
+Adds semantic-page defaults:
+- page.heroNote
+- page.navigation
+- page.sections
+- page.footer
 
-- `page.heroNote`;
-- `page.navigation`;
-- `page.sections`; and
-- `page.footer`.
+### v2 → v3
 
-Migration does not silently claim that the old project originally contained those values; the open receipt reports the migration.
+Adds reusable motion and responsive state:
+- background.motionProfile
+- background.motionScale
+- background.sceneElements
+- page.heroTransition
+- per-section transition
+- per-section desktop/phone visibility
+- per-scene-element desktop/phone visibility
+
+A v1 source reports both v1→v2 and v2→v3. Migration does not claim the old project originally contained the new fields; the receipt reports the change explicitly.
