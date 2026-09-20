@@ -9,8 +9,9 @@
     "build:inline": "npm run build && node scripts/inline-preview.mjs",
     "build:review": "npm run build:inline && node scripts/write-example-export.mjs",
     "preview": "vite preview",
-    "test": "node --test tests/project-export.test.mjs",
-    "test:sites": "node --test tests/sites-worker.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:sites": "node --test tests/sites-worker.test.mjs",
+    "builder:apply": "node scripts/apply-builder-batch.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",

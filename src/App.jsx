@@ -35,10 +35,17 @@ import {
   buildProjectFile,
   parseProjectFile,
   projectSnapshot,
-  updateProject,
   validateProject,
 } from "./model/project.js";
 import { downloadStandaloneSite } from "./export/exportSite.js";
+import {
+  applyBuilderBatch,
+  builderSessionSnapshot,
+  createBuilderBatch,
+  createBuilderSession,
+  parseBuilderBatch,
+} from "./contract/builderSession.js";
+import { CollaborationPanel } from "./editor/CollaborationPanel.jsx";
 import { PageControls } from "./editor/PageControls.jsx";
 import { AXM_FRONT_DOOR_PROJECT } from "./projects/axmFrontDoor.js";
 
@@ -191,11 +198,11 @@ function Stage({ project, published, interactive, onInteractive, onExit }) {
   );
 }
 
-function SceneRail({ project, setProject, uploadRef, isOpen, onClose }) {
-  const set = (path, value) => setProject((current) => updateProject(current, path, value));
+function SceneRail({ project, session, dispatchHuman, onApplyAiBatch, onExportSession, uploadRef, isOpen, onClose }) {
+  const set = (path, value, label) => dispatchHuman([{ type: "set", payload: { path, value } }], label || `Set ${path}`);
   const selectBackground = (type) => {
     if (!BACKGROUND_TYPES.includes(type)) return;
-    set("background.type", type);
+    set("background.type", type, "Change background adapter");
     if (["video", "image"].includes(type)) uploadRef.current?.click();
   };
 
@@ -224,7 +231,7 @@ function SceneRail({ project, setProject, uploadRef, isOpen, onClose }) {
         <RailRow icon={CloudSun} label="Atmosphere">
           <label className="rail-control">
             <span>Atmosphere <b>{project.background.atmosphere}%</b></span>
-            <input type="range" min="0" max="100" value={project.background.atmosphere} onChange={(event) => set("background.atmosphere", Number(event.target.value))} />
+            <input type="range" min="0" max="100" value={project.background.atmosphere} onChange={(event) => set("background.atmosphere", Number(event.target.value), "Adjust atmosphere")} />
           </label>
           <SubRow label="Sky gradient" />
           <SubRow label="Fog planes" />
@@ -240,23 +247,28 @@ function SceneRail({ project, setProject, uploadRef, isOpen, onClose }) {
         <RailRow icon={PanelTop} label="Page layer">
           <div className="surface-switch" aria-label="Page surface">
             {["clear", "glass", "solid"].map((surface) => (
-              <button className={project.page.surface === surface ? "is-selected" : ""} key={surface} onClick={() => set("page.surface", surface)} type="button">{surface}</button>
+              <button className={project.page.surface === surface ? "is-selected" : ""} key={surface} onClick={() => set("page.surface", surface, "Set hero surface")} type="button">{surface}</button>
             ))}
           </div>
-          <PageControls project={project} setProject={setProject} />
+          <PageControls project={project} dispatch={dispatchHuman} />
         </RailRow>
 
         <RailRow icon={Code2} label="Capabilities">
           <SubRow label="Interaction handoff" icon={MousePointer2} />
           <SubRow label="State changes" icon={RotateCcw} />
           <SubRow label="Standalone export" icon={Download} />
+          <CollaborationPanel
+            session={session}
+            onApplyAiBatch={onApplyAiBatch}
+            onExportSession={onExportSession}
+          />
         </RailRow>
       </div>
     </aside>
   );
 }
 
-function StateStrip({ project, setProject }) {
+function StateStrip({ project, dispatchHuman }) {
   return (
     <footer className="state-strip">
       <span className="state-label">Scene state</span>
@@ -265,7 +277,9 @@ function StateStrip({ project, setProject }) {
           <button
             key={id}
             className={`state-card state-${id}${project.background.state === id ? " is-selected" : ""}`}
-            onClick={() => setProject((current) => updateProject(current, "background.state", id))}
+            onClick={() => dispatchHuman([
+              { type: "set", payload: { path: "background.state", value: id } },
+            ], `Set scene state · ${state.label}`)}
             type="button"
           >
             <i /><span>{state.label}</span><small>{id === "night" ? "Low light" : `${Math.round(state.speed * 100)}% motion`}</small>
@@ -282,7 +296,7 @@ function StateStrip({ project, setProject }) {
 }
 
 export function App() {
-  const [project, setProject] = useState(AXM_FRONT_DOOR_PROJECT);
+  const [session, setSession] = useState(() => createBuilderSession(AXM_FRONT_DOOR_PROJECT, { sessionId: "browser-session" }));
   const [mode, setMode] = useState("edit");
   const [interactive, setInteractive] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
@@ -291,11 +305,58 @@ export function App() {
   const [sourceReceipt, setSourceReceipt] = useState(null);
   const uploadRef = useRef(null);
   const projectOpenRef = useRef(null);
+  const project = session.project;
 
   const showNotice = (message) => {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2600);
   };
+
+  const dispatchHuman = (commands, label = "Human edit") => {
+    const batch = createBuilderBatch(session, {
+      actor: { type: "human", id: "local-user" },
+      label,
+      commands,
+    });
+    const result = applyBuilderBatch(session, batch);
+    if (!result.ok) {
+      showNotice(result.holds.join(" · "));
+      return false;
+    }
+    setSession(result.session);
+    return true;
+  };
+
+  const applyAiBatchText = (text) => {
+    try {
+      const batch = parseBuilderBatch(text);
+      if (batch.actor?.type !== "ai") {
+        showNotice("HOLD_AI_BATCH_ACTOR_REQUIRED");
+        return;
+      }
+      const result = applyBuilderBatch(session, batch);
+      if (!result.ok) {
+        const conflict = result.holds.includes("HOLD_SESSION_REVISION_CONFLICT")
+          ? ` · expected r${result.expectedRevision}, received r${result.receivedRevision}`
+          : "";
+        showNotice(`${result.holds.join(" · ")}${conflict}`);
+        return;
+      }
+      setSession(result.session);
+      showNotice(`AI batch applied · revision ${result.session.revision}`);
+    } catch (error) {
+      showNotice(error.message);
+    }
+  };
+
+  const exportSession = () => {
+    downloadTextFile(
+      `axm-builder-session-r${session.revision}.json`,
+      builderSessionSnapshot(session),
+    );
+    showNotice(`Session context exported · revision ${session.revision}`);
+  };
+
   const exportSite = () => {
     try {
       downloadStandaloneSite(project);
@@ -304,6 +365,7 @@ export function App() {
       showNotice(error.message);
     }
   };
+
   const saveProject = async () => {
     try {
       const saved = await buildProjectFile(project);
@@ -315,12 +377,13 @@ export function App() {
       showNotice(error.message);
     }
   };
+
   const openProject = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       const opened = await parseProjectFile(await file.text(), { sourceName: file.name });
-      setProject(opened.project);
+      setSession(createBuilderSession(opened.project, { sessionId: "browser-session" }));
       setInteractive(false);
       setSourceReceipt(opened.receipt);
       const migrationNote = opened.receipt.migrations.length ? ` · migrated ${opened.receipt.migrations.join(", ")}` : "";
@@ -331,20 +394,35 @@ export function App() {
       event.target.value = "";
     }
   };
+
   const loadMedia = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const type = file.type.startsWith("video/") ? "video" : "image";
     const reader = new FileReader();
     reader.addEventListener("load", () => {
-      setProject((current) => ({ ...current, background: { ...current.background, type, mediaUrl: String(reader.result) } }));
+      const batch = createBuilderBatch(session, {
+        actor: { type: "human", id: "local-user" },
+        label: `Bind ${type} media`,
+        commands: [{
+          type: "background.configure",
+          payload: { type, mediaUrl: String(reader.result) },
+        }],
+      });
+      const result = applyBuilderBatch(session, batch);
+      if (!result.ok) {
+        showNotice(result.holds.join(" · "));
+        return;
+      }
+      setSession(result.session);
       showNotice(`${type === "video" ? "Video" : "Image"} bound to the live background`);
     });
     reader.readAsDataURL(file);
     event.target.value = "";
   };
+
   const resetProject = () => {
-    setProject(AXM_FRONT_DOOR_PROJECT);
+    setSession(createBuilderSession(AXM_FRONT_DOOR_PROJECT, { sessionId: "browser-session" }));
     setInteractive(false);
     setSourceReceipt(null);
     showNotice("Front door restored to its project baseline");
@@ -357,7 +435,7 @@ export function App() {
         {!interactive && (
           <div className="preview-controls">
             <button onClick={() => setMode("edit")} type="button"><ArrowLeft size={17} /> Editor</button>
-            <span>Published runtime preview</span>
+            <span>Published runtime preview · r{session.revision}</span>
             <button onClick={() => setViewport((current) => current === "desktop" ? "mobile" : "desktop")} type="button">
               {viewport === "desktop" ? <Smartphone size={17} /> : <Monitor size={17} />}
               {viewport === "desktop" ? "Phone" : "Desktop"}
@@ -381,7 +459,7 @@ export function App() {
         </div>
         <button className="topbar-meta" onClick={() => setViewport((current) => current === "desktop" ? "mobile" : "desktop")} title="Toggle desktop and phone canvas" type="button">
           {viewport === "desktop" ? <Monitor size={14} /> : <Smartphone size={14} />}
-          <span>{viewport === "desktop" ? "1440 × 1024" : "390 × 844"}</span><i /><span>100%</span>
+          <span>{viewport === "desktop" ? "1440 × 1024" : "390 × 844"}</span><i /><span>r{session.revision}</span>
         </button>
         <div className="topbar-actions">
           <button className="secondary-action" onClick={() => setMode("preview")} type="button"><CirclePlay size={17} /> <span>Preview site</span></button>
@@ -392,18 +470,27 @@ export function App() {
         </div>
       </header>
 
-      <SceneRail project={project} setProject={setProject} uploadRef={uploadRef} isOpen={railOpen} onClose={() => setRailOpen(false)} />
+      <SceneRail
+        project={project}
+        session={session}
+        dispatchHuman={dispatchHuman}
+        onApplyAiBatch={applyAiBatchText}
+        onExportSession={exportSession}
+        uploadRef={uploadRef}
+        isOpen={railOpen}
+        onClose={() => setRailOpen(false)}
+      />
       {railOpen && <button className="rail-backdrop" onClick={() => setRailOpen(false)} aria-label="Close scene layers" type="button" />}
 
       <div className={`editor-stage-wrap is-view-${viewport}`}>
         <Stage project={project} interactive={interactive} onInteractive={() => setInteractive(true)} onExit={() => setInteractive(false)} />
         <div className="stage-status">
-          <span className="live-dot" /> Live composition <i /> <b>{project.background.type}</b> beneath <b>{project.page.surface} page</b>
+          <span className="live-dot" /> Live composition <i /> <b>{project.background.type}</b> beneath <b>{project.page.surface} page</b><i /><span>r{session.revision}</span>
           {sourceReceipt && <><i /><span title={sourceReceipt.sha256}>source {sourceReceipt.sha256.slice(0, 8)}</span></>}
         </div>
-        <button className="bind-media" onClick={() => uploadRef.current?.click()} type="button"><Upload size={15} /> Bind local media</button>
+        <button className="bind-media" onClick={() => uploadRef.current?.click()} type="button"><Upload size={15} /><span>Bind local media</span></button>
       </div>
-      <StateStrip project={project} setProject={setProject} />
+      <StateStrip project={project} dispatchHuman={dispatchHuman} />
 
       <input ref={uploadRef} className="visually-hidden" type="file" accept="image/*,video/*" onChange={loadMedia} />
       <input ref={projectOpenRef} className="visually-hidden" type="file" accept=".json,.axm.json,application/json" onChange={openProject} />

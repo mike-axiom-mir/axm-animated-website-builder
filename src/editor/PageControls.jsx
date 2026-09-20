@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { SURFACE_MODES, updateProject } from "../model/project.js";
+import { SURFACE_MODES } from "../model/project.js";
 
 function uniqueSectionId(sections) {
   let number = sections.length + 1;
@@ -16,75 +16,66 @@ function Field({ label, children }) {
   return <label className="content-field"><span>{label}</span>{children}</label>;
 }
 
-export function PageControls({ project, setProject }) {
+export function PageControls({ project, dispatch }) {
   const sections = project.page.sections || [];
   const navigation = project.page.navigation || [];
 
-  const set = (path, value) => setProject((current) => updateProject(current, path, value));
-  const setPage = (patch) => setProject((current) => ({
-    ...current,
-    page: { ...current.page, ...patch },
-  }));
-
-  const updateSection = (index, patch) => {
-    const next = sections.map((section, itemIndex) => itemIndex === index ? { ...section, ...patch } : section);
-    setPage({ sections: next });
-  };
+  const set = (path, value, label) => dispatch([{ type: "set", payload: { path, value } }], label || `Set ${path}`);
+  const updateSection = (id, patch, label = "Edit section") => dispatch([
+    { type: "section.update", payload: { id, patch } },
+  ], label);
 
   const addSection = () => {
     const id = uniqueSectionId(sections);
-    const nextSection = {
-      id,
-      eyebrow: "NEW SECTION",
-      title: "Shape this section",
-      body: "Describe what this part of the site should communicate.",
-      surface: "glass",
-      points: [],
-    };
-    setPage({
-      sections: [...sections, nextSection],
-      navigation: [...navigation, { label: `Section ${sections.length + 1}`, href: `#${id}` }],
-    });
+    dispatch([
+      {
+        type: "section.add",
+        payload: {
+          section: {
+            id,
+            eyebrow: "NEW SECTION",
+            title: "Shape this section",
+            body: "Describe what this part of the site should communicate.",
+            surface: "glass",
+            points: [],
+          },
+        },
+      },
+      {
+        type: "navigation.add",
+        payload: { item: { label: `Section ${sections.length + 1}`, href: `#${id}` } },
+      },
+    ], "Add section");
   };
 
-  const removeSection = (index) => {
-    const target = sections[index];
-    setPage({
-      sections: sections.filter((_, itemIndex) => itemIndex !== index),
-      navigation: navigation.filter((item) => item.href !== `#${target.id}`),
-    });
-  };
+  const removeSection = (id) => dispatch([
+    { type: "section.remove", payload: { id } },
+  ], "Remove section");
 
-  const moveSection = (index, direction) => {
-    const target = index + direction;
-    if (target < 0 || target >= sections.length) return;
-    const next = [...sections];
-    [next[index], next[target]] = [next[target], next[index]];
-    setPage({ sections: next });
-  };
+  const moveSection = (id, toIndex) => dispatch([
+    { type: "section.move", payload: { id, toIndex } },
+  ], "Move section");
 
-  const updateNavigation = (index, patch) => {
-    setPage({
-      navigation: navigation.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
-    });
-  };
+  const updateNavigation = (index, patch) => dispatch([
+    { type: "navigation.update", payload: { index, patch } },
+  ], "Edit navigation");
 
-  const addNavigation = () => {
-    setPage({ navigation: [...navigation, { label: "Link", href: "#" }] });
-  };
+  const addNavigation = () => dispatch([
+    { type: "navigation.add", payload: { item: { label: "Link", href: "#" } } },
+  ], "Add navigation");
 
-  const removeNavigation = (index) => {
-    setPage({ navigation: navigation.filter((_, itemIndex) => itemIndex !== index) });
-  };
+  const removeNavigation = (index) => dispatch([
+    { type: "navigation.remove", payload: { index } },
+  ], "Remove navigation");
 
   return (
     <div className="content-editor">
       <div className="content-editor-group">
         <div className="content-editor-title"><span>Hero content</span></div>
-        <Field label="Eyebrow"><input value={project.eyebrow} onChange={(event) => set("eyebrow", event.target.value)} /></Field>
-        <Field label="Title"><textarea rows="2" value={project.title} onChange={(event) => set("title", event.target.value)} /></Field>
-        <Field label="Action"><input value={project.action} onChange={(event) => set("action", event.target.value)} /></Field>
-        <Field label="Hero note"><textarea rows="3" value={project.page.heroNote || ""} onChange={(event) => set("page.heroNote", event.target.value)} /></Field>
+        <Field label="Eyebrow"><input value={project.eyebrow} onChange={(event) => set("eyebrow", event.target.value, "Edit hero eyebrow")} /></Field>
+        <Field label="Title"><textarea rows="2" value={project.title} onChange={(event) => set("title", event.target.value, "Edit hero title")} /></Field>
+        <Field label="Action"><input value={project.action} onChange={(event) => set("action", event.target.value, "Edit hero action")} /></Field>
+        <Field label="Hero note"><textarea rows="3" value={project.page.heroNote || ""} onChange={(event) => set("page.heroNote", event.target.value, "Edit hero note")} /></Field>
       </div>
 
       <div className="content-editor-group">
@@ -98,21 +89,21 @@ export function PageControls({ project, setProject }) {
               <strong>{index + 1}. {section.title || section.id}</strong>
               <span>{section.id}</span>
               <div>
-                <button type="button" onClick={() => moveSection(index, -1)} disabled={index === 0} aria-label="Move section up"><ArrowUp size={13} /></button>
-                <button type="button" onClick={() => moveSection(index, 1)} disabled={index === sections.length - 1} aria-label="Move section down"><ArrowDown size={13} /></button>
-                <button type="button" onClick={() => removeSection(index)} aria-label="Remove section"><Trash2 size={13} /></button>
+                <button type="button" onClick={() => moveSection(section.id, index - 1)} disabled={index === 0} aria-label="Move section up"><ArrowUp size={13} /></button>
+                <button type="button" onClick={() => moveSection(section.id, index + 1)} disabled={index === sections.length - 1} aria-label="Move section down"><ArrowDown size={13} /></button>
+                <button type="button" onClick={() => removeSection(section.id)} aria-label="Remove section"><Trash2 size={13} /></button>
               </div>
             </div>
-            <Field label="Eyebrow"><input value={section.eyebrow || ""} onChange={(event) => updateSection(index, { eyebrow: event.target.value })} /></Field>
-            <Field label="Title"><textarea rows="2" value={section.title || ""} onChange={(event) => updateSection(index, { title: event.target.value })} /></Field>
-            <Field label="Body"><textarea rows="4" value={section.body || ""} onChange={(event) => updateSection(index, { body: event.target.value })} /></Field>
+            <Field label="Eyebrow"><input value={section.eyebrow || ""} onChange={(event) => updateSection(section.id, { eyebrow: event.target.value }, "Edit section eyebrow")} /></Field>
+            <Field label="Title"><textarea rows="2" value={section.title || ""} onChange={(event) => updateSection(section.id, { title: event.target.value }, "Edit section title")} /></Field>
+            <Field label="Body"><textarea rows="4" value={section.body || ""} onChange={(event) => updateSection(section.id, { body: event.target.value }, "Edit section body")} /></Field>
             <Field label="Points · one per line">
               <textarea
                 rows="4"
                 value={(section.points || []).join("\n")}
-                onChange={(event) => updateSection(index, {
+                onChange={(event) => updateSection(section.id, {
                   points: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean),
-                })}
+                }, "Edit section points")}
               />
             </Field>
             <div className="mini-surface-switch" aria-label={`Surface for ${section.id}`}>
@@ -120,7 +111,7 @@ export function PageControls({ project, setProject }) {
                 <button
                   className={(section.surface || "clear") === surface ? "is-selected" : ""}
                   key={surface}
-                  onClick={() => updateSection(index, { surface })}
+                  onClick={() => updateSection(section.id, { surface }, "Set section surface")}
                   type="button"
                 >
                   {surface}
@@ -139,7 +130,7 @@ export function PageControls({ project, setProject }) {
         <label className="content-toggle">
           <input
             checked={project.page.showNavigation}
-            onChange={(event) => set("page.showNavigation", event.target.checked)}
+            onChange={(event) => set("page.showNavigation", event.target.checked, "Toggle navigation")}
             type="checkbox"
           />
           <span>Show navigation</span>
@@ -155,8 +146,8 @@ export function PageControls({ project, setProject }) {
 
       <div className="content-editor-group">
         <div className="content-editor-title"><span>Footer</span></div>
-        <Field label="Left"><input value={project.page.footer?.left || ""} onChange={(event) => setPage({ footer: { ...project.page.footer, left: event.target.value } })} /></Field>
-        <Field label="Right"><input value={project.page.footer?.right || ""} onChange={(event) => setPage({ footer: { ...project.page.footer, right: event.target.value } })} /></Field>
+        <Field label="Left"><input value={project.page.footer?.left || ""} onChange={(event) => set("page.footer.left", event.target.value, "Edit footer left")} /></Field>
+        <Field label="Right"><input value={project.page.footer?.right || ""} onChange={(event) => set("page.footer.right", event.target.value, "Edit footer right")} /></Field>
       </div>
     </div>
   );
