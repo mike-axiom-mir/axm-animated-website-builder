@@ -22,6 +22,20 @@ function exampleBatch(revision) {
           surface: "clear",
         },
       },
+      {
+        type: "hero.choreograph",
+        payload: { sceneCue: { recipe: "calm-intro", overrides: {} } },
+      },
+      {
+        type: "section.choreograph",
+        payload: {
+          id: "workshop",
+          sceneCue: {
+            recipe: "cinematic",
+            overrides: { atmosphere: 90, camera: { zoom: 1.1 } },
+          },
+        },
+      },
     ],
   }, null, 2);
 }
