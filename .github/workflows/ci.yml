@@ -21,3 +21,32 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run test:sites
+
+      - name: Install screenshot browser
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/axm-builder-preview.log 2>&1 &
+          echo $! > /tmp/axm-builder-preview.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/axm-builder-preview.log
+          exit 1
+
+      - name: Capture builder screenshots
+        run: |
+          mkdir -p review-screenshots
+          npx --yes playwright@1.55.0 screenshot             --browser chromium             --viewport-size "1440,1024"             --full-page             http://127.0.0.1:4173/             review-screenshots/builder-desktop-1440x1024.png
+          npx --yes playwright@1.55.0 screenshot             --browser chromium             --device "iPhone 13"             --full-page             http://127.0.0.1:4173/             review-screenshots/builder-phone-390x844.png
+
+      - name: Upload visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: builder-visual-review
+          path: review-screenshots/*.png
+          if-no-files-found: error
