@@ -1,4 +1,15 @@
-import { BACKGROUND_TYPES, SCENE_STATES, SURFACE_MODES, migrateProject, validateProject } from "../model/project.js";
+import {
+  BACKGROUND_TYPES,
+  ELEMENT_MOTIONS,
+  ELEMENT_TONES,
+  MOTION_PROFILES,
+  SCENE_ELEMENT_TYPES,
+  SCENE_STATES,
+  SURFACE_MODES,
+  TRANSITION_TYPES,
+  migrateProject,
+  validateProject,
+} from "../model/project.js";
 
 export const BUILDER_SESSION_FORMAT = "axm-builder-session";
 export const BUILDER_SESSION_VERSION = 1;
@@ -7,27 +18,21 @@ export const BUILDER_BATCH_VERSION = 1;
 
 const ACTOR_TYPES = new Set(["human", "ai", "system"]);
 const SET_PATHS = new Set([
-  "title",
-  "eyebrow",
-  "action",
-  "background.type",
-  "background.state",
-  "background.seed",
-  "background.motion",
-  "background.atmosphere",
-  "background.mediaUrl",
-  "page.surface",
-  "page.interaction",
-  "page.showNavigation",
-  "page.heroNote",
-  "page.footer.left",
-  "page.footer.right",
+  "title", "eyebrow", "action",
+  "background.type", "background.state", "background.seed", "background.motion",
+  "background.atmosphere", "background.mediaUrl", "background.motionProfile", "background.motionScale",
+  "page.surface", "page.interaction", "page.showNavigation", "page.heroNote",
+  "page.heroTransition.type", "page.heroTransition.duration", "page.heroTransition.delay",
+  "page.footer.left", "page.footer.right",
 ]);
-
-const SECTION_PATCH_KEYS = new Set(["eyebrow", "title", "body", "surface", "points", "links"]);
+const SECTION_PATCH_KEYS = new Set(["eyebrow", "title", "body", "surface", "points", "links", "transition", "visibility"]);
 const NAV_PATCH_KEYS = new Set(["label", "href"]);
-const BACKGROUND_PATCH_KEYS = new Set(["type", "state", "seed", "motion", "atmosphere", "mediaUrl"]);
-const HERO_PATCH_KEYS = new Set(["title", "eyebrow", "action", "heroNote", "surface"]);
+const BACKGROUND_PATCH_KEYS = new Set([
+  "type", "state", "seed", "motion", "atmosphere", "mediaUrl",
+  "motionProfile", "motionScale",
+]);
+const HERO_PATCH_KEYS = new Set(["title", "eyebrow", "action", "heroNote", "surface", "transition"]);
+const ELEMENT_PATCH_KEYS = new Set(["type", "x", "y", "size", "opacity", "motion", "speed", "phase", "tone", "visibility"]);
 
 function failure(code, extra = {}) {
   return { ok: false, holds: [code], ...extra };
@@ -60,6 +65,18 @@ function requireIndex(index, length, holdCode) {
   if (!Number.isInteger(index) || index < 0 || index >= length) throw new Error(holdCode);
 }
 
+function assertTransition(transition) {
+  if (!transition || typeof transition !== "object" || !TRANSITION_TYPES.includes(transition.type)) {
+    throw new Error("HOLD_INVALID_TRANSITION");
+  }
+}
+
+function assertElementPatch(patch) {
+  if (patch.type !== undefined && !SCENE_ELEMENT_TYPES.includes(patch.type)) throw new Error("HOLD_UNKNOWN_SCENE_ELEMENT_TYPE");
+  if (patch.motion !== undefined && !ELEMENT_MOTIONS.includes(patch.motion)) throw new Error("HOLD_UNKNOWN_ELEMENT_MOTION");
+  if (patch.tone !== undefined && !ELEMENT_TONES.includes(patch.tone)) throw new Error("HOLD_UNKNOWN_ELEMENT_TONE");
+}
+
 function applyCommand(project, command) {
   if (!command || typeof command !== "object" || Array.isArray(command) || typeof command.type !== "string") {
     throw new Error("HOLD_INVALID_BUILDER_COMMAND");
@@ -70,7 +87,9 @@ function applyCommand(project, command) {
     if (!SET_PATHS.has(payload.path)) throw new Error("HOLD_COMMAND_PATH_NOT_ALLOWED");
     if (payload.path === "background.type" && !BACKGROUND_TYPES.includes(payload.value)) throw new Error("HOLD_UNKNOWN_BACKGROUND");
     if (payload.path === "background.state" && !SCENE_STATES[payload.value]) throw new Error("HOLD_UNKNOWN_SCENE_STATE");
-    if ((payload.path === "page.surface") && !SURFACE_MODES.includes(payload.value)) throw new Error("HOLD_UNKNOWN_SURFACE");
+    if (payload.path === "background.motionProfile" && !MOTION_PROFILES[payload.value]) throw new Error("HOLD_UNKNOWN_MOTION_PROFILE");
+    if (payload.path === "page.surface" && !SURFACE_MODES.includes(payload.value)) throw new Error("HOLD_UNKNOWN_SURFACE");
+    if (payload.path === "page.heroTransition.type" && !TRANSITION_TYPES.includes(payload.value)) throw new Error("HOLD_INVALID_TRANSITION");
     return immutableSet(project, payload.path, structuredClone(payload.value));
   }
 
@@ -78,22 +97,92 @@ function applyCommand(project, command) {
     const patch = onlyPatch(payload, BACKGROUND_PATCH_KEYS, "HOLD_INVALID_BACKGROUND_PATCH");
     if (patch.type !== undefined && !BACKGROUND_TYPES.includes(patch.type)) throw new Error("HOLD_UNKNOWN_BACKGROUND");
     if (patch.state !== undefined && !SCENE_STATES[patch.state]) throw new Error("HOLD_UNKNOWN_SCENE_STATE");
+    if (patch.motionProfile !== undefined && !MOTION_PROFILES[patch.motionProfile]) throw new Error("HOLD_UNKNOWN_MOTION_PROFILE");
     return { ...project, background: { ...project.background, ...patch } };
+  }
+
+  if (command.type === "motion.configure") {
+    if (payload.profile !== undefined && !MOTION_PROFILES[payload.profile]) throw new Error("HOLD_UNKNOWN_MOTION_PROFILE");
+    return {
+      ...project,
+      background: {
+        ...project.background,
+        ...(payload.profile !== undefined ? { motionProfile: payload.profile } : {}),
+        ...(payload.scale !== undefined ? { motionScale: payload.scale } : {}),
+        ...(payload.enabled !== undefined ? { motion: Boolean(payload.enabled) } : {}),
+      },
+    };
   }
 
   if (command.type === "hero.configure") {
     const patch = onlyPatch(payload, HERO_PATCH_KEYS, "HOLD_INVALID_HERO_PATCH");
-    const next = { ...project };
+    const next = { ...project, page: { ...project.page } };
     if (patch.title !== undefined) next.title = patch.title;
     if (patch.eyebrow !== undefined) next.eyebrow = patch.eyebrow;
     if (patch.action !== undefined) next.action = patch.action;
-    next.page = { ...project.page };
     if (patch.heroNote !== undefined) next.page.heroNote = patch.heroNote;
     if (patch.surface !== undefined) {
       if (!SURFACE_MODES.includes(patch.surface)) throw new Error("HOLD_UNKNOWN_SURFACE");
       next.page.surface = patch.surface;
     }
+    if (patch.transition !== undefined) {
+      assertTransition(patch.transition);
+      next.page.heroTransition = structuredClone(patch.transition);
+    }
     return next;
+  }
+
+  if (command.type === "scene.compose") {
+    const next = structuredClone(project);
+    if (payload.motionProfile !== undefined) {
+      if (!MOTION_PROFILES[payload.motionProfile]) throw new Error("HOLD_UNKNOWN_MOTION_PROFILE");
+      next.background.motionProfile = payload.motionProfile;
+    }
+    if (payload.motionScale !== undefined) next.background.motionScale = payload.motionScale;
+    if (payload.elements !== undefined) next.background.sceneElements = structuredClone(payload.elements);
+    return next;
+  }
+
+  if (command.type === "scene.element.add") {
+    const element = structuredClone(payload.element);
+    if (!element?.id || project.background.sceneElements.some((item) => item.id === element.id)) {
+      throw new Error("HOLD_INVALID_SCENE_ELEMENT_ID");
+    }
+    const elements = [...project.background.sceneElements];
+    const index = payload.index === undefined ? elements.length : payload.index;
+    if (!Number.isInteger(index) || index < 0 || index > elements.length) throw new Error("HOLD_INVALID_SCENE_ELEMENT_INDEX");
+    elements.splice(index, 0, element);
+    return { ...project, background: { ...project.background, sceneElements: elements } };
+  }
+
+  if (command.type === "scene.element.update") {
+    const index = project.background.sceneElements.findIndex((item) => item.id === payload.id);
+    if (index < 0) throw new Error("HOLD_SCENE_ELEMENT_NOT_FOUND");
+    const patch = onlyPatch(payload.patch, ELEMENT_PATCH_KEYS, "HOLD_INVALID_SCENE_ELEMENT_PATCH");
+    assertElementPatch(patch);
+    const elements = project.background.sceneElements.map((element, itemIndex) => itemIndex === index ? { ...element, ...patch } : element);
+    return { ...project, background: { ...project.background, sceneElements: elements } };
+  }
+
+  if (command.type === "scene.element.remove") {
+    if (!project.background.sceneElements.some((item) => item.id === payload.id)) throw new Error("HOLD_SCENE_ELEMENT_NOT_FOUND");
+    return {
+      ...project,
+      background: {
+        ...project.background,
+        sceneElements: project.background.sceneElements.filter((item) => item.id !== payload.id),
+      },
+    };
+  }
+
+  if (command.type === "scene.element.move") {
+    const fromIndex = project.background.sceneElements.findIndex((item) => item.id === payload.id);
+    if (fromIndex < 0) throw new Error("HOLD_SCENE_ELEMENT_NOT_FOUND");
+    requireIndex(payload.toIndex, project.background.sceneElements.length, "HOLD_INVALID_SCENE_ELEMENT_INDEX");
+    const elements = [...project.background.sceneElements];
+    const [element] = elements.splice(fromIndex, 1);
+    elements.splice(payload.toIndex, 0, element);
+    return { ...project, background: { ...project.background, sceneElements: elements } };
   }
 
   if (command.type === "section.add") {
@@ -112,13 +201,13 @@ function applyCommand(project, command) {
     if (index < 0) throw new Error("HOLD_SECTION_NOT_FOUND");
     const patch = onlyPatch(payload.patch, SECTION_PATCH_KEYS, "HOLD_INVALID_SECTION_PATCH");
     if (patch.surface !== undefined && !SURFACE_MODES.includes(patch.surface)) throw new Error("HOLD_UNKNOWN_SECTION_SURFACE");
+    if (patch.transition !== undefined) assertTransition(patch.transition);
     const sections = project.page.sections.map((section, itemIndex) => itemIndex === index ? { ...section, ...patch } : section);
     return { ...project, page: { ...project.page, sections } };
   }
 
   if (command.type === "section.remove") {
-    const found = project.page.sections.some((item) => item.id === payload.id);
-    if (!found) throw new Error("HOLD_SECTION_NOT_FOUND");
+    if (!project.page.sections.some((item) => item.id === payload.id)) throw new Error("HOLD_SECTION_NOT_FOUND");
     return {
       ...project,
       page: {
@@ -157,13 +246,7 @@ function applyCommand(project, command) {
 
   if (command.type === "navigation.remove") {
     requireIndex(payload.index, project.page.navigation.length, "HOLD_INVALID_NAVIGATION_INDEX");
-    return {
-      ...project,
-      page: {
-        ...project.page,
-        navigation: project.page.navigation.filter((_, index) => index !== payload.index),
-      },
-    };
+    return { ...project, page: { ...project.page, navigation: project.page.navigation.filter((_, index) => index !== payload.index) } };
   }
 
   if (command.type === "page.compose") {
@@ -206,15 +289,9 @@ export function createBuilderBatch(session, { actor, label = "", commands }) {
 }
 
 export function applyBuilderBatch(session, batch) {
-  if (!session || session.format !== BUILDER_SESSION_FORMAT || session.version !== BUILDER_SESSION_VERSION) {
-    return failure("HOLD_INVALID_BUILDER_SESSION", { session });
-  }
-  if (!batch || batch.format !== BUILDER_BATCH_FORMAT || batch.version !== BUILDER_BATCH_VERSION) {
-    return failure("HOLD_INVALID_COMMAND_BATCH", { session });
-  }
-  if (!ACTOR_TYPES.has(batch.actor?.type) || !batch.actor?.id) {
-    return failure("HOLD_INVALID_COMMAND_ACTOR", { session });
-  }
+  if (!session || session.format !== BUILDER_SESSION_FORMAT || session.version !== BUILDER_SESSION_VERSION) return failure("HOLD_INVALID_BUILDER_SESSION", { session });
+  if (!batch || batch.format !== BUILDER_BATCH_FORMAT || batch.version !== BUILDER_BATCH_VERSION) return failure("HOLD_INVALID_COMMAND_BATCH", { session });
+  if (!ACTOR_TYPES.has(batch.actor?.type) || !batch.actor?.id) return failure("HOLD_INVALID_COMMAND_ACTOR", { session });
   if (batch.baseRevision !== session.revision) {
     return failure("HOLD_SESSION_REVISION_CONFLICT", {
       session,
@@ -222,9 +299,7 @@ export function applyBuilderBatch(session, batch) {
       receivedRevision: batch.baseRevision,
     });
   }
-  if (!Array.isArray(batch.commands) || batch.commands.length === 0 || batch.commands.length > 100) {
-    return failure("HOLD_INVALID_COMMAND_BATCH", { session });
-  }
+  if (!Array.isArray(batch.commands) || batch.commands.length === 0 || batch.commands.length > 100) return failure("HOLD_INVALID_COMMAND_BATCH", { session });
 
   let project = structuredClone(session.project);
   try {
@@ -233,7 +308,8 @@ export function applyBuilderBatch(session, batch) {
     return failure(error.message || "HOLD_COMMAND_FAILED", { session });
   }
 
-  const check = validateProject(project);
+  const migrated = migrateProject(project);
+  const check = validateProject(migrated.project);
   if (!check.ok) return { ok: false, holds: check.holds, session };
 
   const revision = session.revision + 1;
@@ -252,7 +328,7 @@ export function applyBuilderBatch(session, batch) {
     session: {
       ...session,
       revision,
-      project,
+      project: migrated.project,
       log: [...session.log, logEntry],
     },
     receipt: {
