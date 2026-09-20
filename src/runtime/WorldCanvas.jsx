@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { resolveSceneCue } from "../model/choreography.js";
 import { MOTION_PROFILES, SCENE_STATES } from "../model/project.js";
 
 function polygon(ctx, points, fill, stroke) {
@@ -19,21 +20,85 @@ function seeded(seed, index) {
   return x - Math.floor(x);
 }
 
-function toneRgb(element, state) {
-  if (element.tone === "sun") return state.sun;
-  if (element.tone === "ice") return [205, 246, 255];
-  if (element.tone === "muted") return [112, 148, 160];
-  return state.accent;
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
-function drawSceneElement(ctx, width, height, time, project, state, element, index) {
+function lerpArray(a, b, t) {
+  return a.map((value, index) => lerp(value, b[index], t));
+}
+
+function baseRuntime(project) {
+  const cue = resolveSceneCue(project.background, project.page.heroSceneCue);
+  const state = SCENE_STATES[cue.state] || SCENE_STATES.idle;
+  const profile = MOTION_PROFILES[cue.motionProfile] || MOTION_PROFILES.drift;
+  return {
+    sky: [...state.sky],
+    sun: [...state.sun],
+    accent: [...state.accent],
+    stateSpeed: state.speed,
+    motionSpeed: profile.speed,
+    motionScale: cue.motionScale,
+    atmosphere: cue.atmosphere,
+    atomIntensity: cue.atomIntensity,
+    cameraX: cue.camera.x,
+    cameraY: cue.camera.y,
+    cameraZoom: cue.camera.zoom,
+  };
+}
+
+function targetRuntime(project, sceneCue) {
+  const cue = project.page.choreography?.enabled
+    ? resolveSceneCue(project.background, sceneCue)
+    : resolveSceneCue(project.background, { recipe: "inherit", overrides: {} });
+  const state = SCENE_STATES[cue.state] || SCENE_STATES.idle;
+  const profile = MOTION_PROFILES[cue.motionProfile] || MOTION_PROFILES.drift;
+  return {
+    cue,
+    sky: state.sky,
+    sun: state.sun,
+    accent: state.accent,
+    stateSpeed: state.speed,
+    motionSpeed: profile.speed,
+    motionScale: cue.motionScale,
+    atmosphere: cue.atmosphere,
+    atomIntensity: cue.atomIntensity,
+    cameraX: cue.camera.x,
+    cameraY: cue.camera.y,
+    cameraZoom: cue.camera.zoom,
+  };
+}
+
+function easeRuntime(live, target, dt) {
+  const blendMs = Math.max(0, target.cue.blendMs);
+  const amount = blendMs === 0 ? 1 : 1 - Math.exp(-(dt * 1000) / Math.max(30, blendMs / 4));
+  live.sky = lerpArray(live.sky, target.sky, amount);
+  live.sun = lerpArray(live.sun, target.sun, amount);
+  live.accent = lerpArray(live.accent, target.accent, amount);
+  live.stateSpeed = lerp(live.stateSpeed, target.stateSpeed, amount);
+  live.motionSpeed = lerp(live.motionSpeed, target.motionSpeed, amount);
+  live.motionScale = lerp(live.motionScale, target.motionScale, amount);
+  live.atmosphere = lerp(live.atmosphere, target.atmosphere, amount);
+  live.atomIntensity = lerp(live.atomIntensity, target.atomIntensity, amount);
+  live.cameraX = lerp(live.cameraX, target.cameraX, amount);
+  live.cameraY = lerp(live.cameraY, target.cameraY, amount);
+  live.cameraZoom = lerp(live.cameraZoom, target.cameraZoom, amount);
+}
+
+function toneRgb(element, runtime) {
+  if (element.tone === "sun") return runtime.sun;
+  if (element.tone === "ice") return [205, 246, 255];
+  if (element.tone === "muted") return [112, 148, 160];
+  return runtime.accent;
+}
+
+function drawSceneElement(ctx, width, height, time, project, runtime, element, index) {
   const mobile = width <= 720;
   if (mobile && element.visibility?.mobile === false) return;
   if (!mobile && element.visibility?.desktop === false) return;
 
-  const profile = MOTION_PROFILES[project.background.motionProfile] || MOTION_PROFILES.drift;
   const activeTime = project.background.motion
-    ? time * profile.speed * project.background.motionScale * element.speed
+    ? time * runtime.motionSpeed * runtime.motionScale * element.speed
     : 0;
   const phase = element.phase || 0;
   let radius = Math.max(5, Math.min(width, height) * element.size);
@@ -51,13 +116,14 @@ function drawSceneElement(ctx, width, height, time, project, state, element, ind
     y += Math.sin(activeTime + phase) * radius * 0.7;
   }
 
-  const [r, g, b] = toneRgb(element, state);
-  const alpha = element.opacity;
-  ctx.save();
+  const [r, g, b] = toneRgb(element, runtime);
+  const alpha = Math.min(1, element.opacity * runtime.atomIntensity);
+  radius *= Math.max(0.35, Math.min(1.35, runtime.atomIntensity));
 
+  ctx.save();
   if (element.type === "orb") {
     const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.8);
-    glow.addColorStop(0, `rgba(${r},${g},${b},${Math.min(alpha, 1)})`);
+    glow.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
     glow.addColorStop(0.28, `rgba(${r},${g},${b},${alpha * 0.38})`);
     glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
     ctx.fillStyle = glow;
@@ -115,18 +181,12 @@ function drawSceneElement(ctx, width, height, time, project, state, element, ind
       ctx.fill();
     }
   }
-
   ctx.restore();
 }
 
-function drawWorld(ctx, width, height, time, project, keys) {
-  const state = SCENE_STATES[project.background.state] || SCENE_STATES.idle;
-  const profile = MOTION_PROFILES[project.background.motionProfile] || MOTION_PROFILES.drift;
-  const motion = project.background.motion
-    ? time * state.speed * profile.speed * project.background.motionScale
-    : 0;
-  const [sr, sg, sb] = state.sky;
-  const [ar, ag, ab] = state.accent;
+function drawWorld(ctx, width, height, time, project, keys, runtime) {
+  const [sr, sg, sb] = runtime.sky;
+  const [ar, ag, ab] = runtime.accent;
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, `rgb(${sr},${sg},${sb})`);
   gradient.addColorStop(0.56, `rgb(${Math.min(sr + 23, 255)},${Math.min(sg + 32, 255)},${Math.min(sb + 38, 255)})`);
@@ -134,13 +194,18 @@ function drawWorld(ctx, width, height, time, project, keys) {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
+  ctx.save();
+  ctx.translate(width * 0.5 + runtime.cameraX * width, height * 0.5 + runtime.cameraY * height);
+  ctx.scale(runtime.cameraZoom, runtime.cameraZoom);
+  ctx.translate(-width * 0.5, -height * 0.5);
+
   const sunX = width * 0.24;
   const sunY = height * 0.34;
   const sunR = Math.min(width, height) * 0.052;
   const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.4);
-  sunGlow.addColorStop(0, `rgba(${state.sun.join(",")},.95)`);
-  sunGlow.addColorStop(0.2, `rgba(${state.sun.join(",")},.5)`);
-  sunGlow.addColorStop(1, `rgba(${state.sun.join(",")},0)`);
+  sunGlow.addColorStop(0, `rgba(${runtime.sun.join(",")},.95)`);
+  sunGlow.addColorStop(0.2, `rgba(${runtime.sun.join(",")},.5)`);
+  sunGlow.addColorStop(1, `rgba(${runtime.sun.join(",")},0)`);
   ctx.fillStyle = sunGlow;
   ctx.fillRect(sunX - sunR * 4, sunY - sunR * 4, sunR * 8, sunR * 8);
 
@@ -159,7 +224,7 @@ function drawWorld(ctx, width, height, time, project, keys) {
   water.addColorStop(0, "rgba(26,76,88,.55)");
   water.addColorStop(1, "#030b10");
   ctx.fillStyle = water;
-  ctx.fillRect(0, height * 0.55, width, height * 0.45);
+  ctx.fillRect(-width * 0.1, height * 0.55, width * 1.2, height * 0.55);
 
   const horizon = height * 0.68;
   for (let i = 0; i < 26; i += 1) {
@@ -178,8 +243,11 @@ function drawWorld(ctx, width, height, time, project, keys) {
     }
   }
 
+  const motion = project.background.motion
+    ? time * runtime.stateSpeed * runtime.motionSpeed * runtime.motionScale
+    : 0;
   const ledgeY = height * 0.78;
-  polygon(ctx, [[0, ledgeY + 40], [width * 0.3, ledgeY - 35], [width * 0.55, ledgeY + 30], [width, ledgeY - 20], [width, height], [0, height]], "#06141a");
+  polygon(ctx, [[-width * 0.1, ledgeY + 40], [width * 0.3, ledgeY - 35], [width * 0.55, ledgeY + 30], [width * 1.1, ledgeY - 20], [width * 1.1, height * 1.1], [-width * 0.1, height * 1.1]], "#06141a");
   ctx.strokeStyle = `rgba(${ar},${ag},${ab},.65)`;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -196,7 +264,7 @@ function drawWorld(ctx, width, height, time, project, keys) {
   }
 
   for (const [index, element] of project.background.sceneElements.entries()) {
-    drawSceneElement(ctx, width, height, time, project, state, element, index);
+    drawSceneElement(ctx, width, height, time, project, runtime, element, index);
   }
 
   if (project.background.type === "game") {
@@ -212,23 +280,27 @@ function drawWorld(ctx, width, height, time, project, keys) {
     ctx.shadowBlur = 0;
   }
 
-  const atmosphere = project.background.atmosphere / 100;
-  ctx.fillStyle = `rgba(18,48,60,${0.015 + atmosphere * 0.055})`;
+  ctx.restore();
+  ctx.fillStyle = `rgba(18,48,60,${0.015 + (runtime.atmosphere / 100) * 0.055})`;
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = "rgba(0,0,0,.12)";
   ctx.fillRect(0, 0, width, height);
 }
 
-export function WorldCanvas({ project, interactive }) {
+export function WorldCanvas({ project, interactive, sceneCue }) {
   const canvasRef = useRef(null);
   const keys = useRef({});
+  const cueRef = useRef(sceneCue);
+  cueRef.current = sceneCue;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
+    const live = baseRuntime(project);
     let frame = 0;
     let width = 0;
     let height = 0;
+    let previous = performance.now();
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -242,7 +314,10 @@ export function WorldCanvas({ project, interactive }) {
     const keyDown = (event) => { if (interactive) keys.current[event.key] = true; };
     const keyUp = (event) => { keys.current[event.key] = false; };
     const tick = (now) => {
-      drawWorld(context, width, height, now / 1000, project, keys);
+      const dt = Math.min(0.05, Math.max(0, (now - previous) / 1000));
+      previous = now;
+      easeRuntime(live, targetRuntime(project, cueRef.current), dt);
+      drawWorld(context, width, height, now / 1000, project, keys, live);
       frame = window.requestAnimationFrame(tick);
     };
 
@@ -259,12 +334,12 @@ export function WorldCanvas({ project, interactive }) {
     };
   }, [project, interactive]);
 
-  return <canvas className="world-canvas" ref={canvasRef} aria-label="Live animated world with reusable scene elements" />;
+  return <canvas className="world-canvas" ref={canvasRef} aria-label="Live animated world with section choreography" />;
 }
 
-export function BackgroundRuntime({ project, interactive }) {
+export function BackgroundRuntime({ project, interactive, sceneCue }) {
   const { type, mediaUrl } = project.background;
   if (type === "video" && mediaUrl) return <video className="background-media" src={mediaUrl} autoPlay loop muted playsInline />;
   if (type === "image" && mediaUrl) return <img className="background-media" src={mediaUrl} alt="Uploaded background asset" />;
-  return <WorldCanvas project={project} interactive={interactive} />;
+  return <WorldCanvas project={project} interactive={interactive} sceneCue={sceneCue} />;
 }

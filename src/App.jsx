@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Aperture,
   ArrowLeft,
@@ -100,29 +100,71 @@ function SubRow({ label, selected, dot, onClick, icon: Icon = Folder }) {
   );
 }
 
-function PageOverlay({ project, interactive, onAction }) {
+function PageOverlay({ project, interactive, onAction, onSceneTargetChange }) {
   const navigation = project.page.navigation || [];
   const sections = project.page.sections || [];
   const firstSection = sections[0]?.id ? `#${sections[0].id}` : "#";
   const footer = project.page.footer || {};
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    const root = layerRef.current;
+    if (!root || !project.page.choreography?.enabled) {
+      onSceneTargetChange?.("hero");
+      return undefined;
+    }
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rootRect = root.getBoundingClientRect();
+      const focusY = rootRect.top + root.clientHeight * 0.46;
+      const targets = [...root.querySelectorAll("[data-scene-target]")].filter((node) => {
+        const style = getComputedStyle(node);
+        return style.display !== "none";
+      });
+      let best = targets[0];
+      let bestDistance = Infinity;
+      for (const node of targets) {
+        const rect = node.getBoundingClientRect();
+        const center = Math.max(rect.top, rootRect.top) + Math.min(rect.height, root.clientHeight) * 0.5;
+        const distance = Math.abs(center - focusY);
+        if (distance < bestDistance) {
+          best = node;
+          bestDistance = distance;
+        }
+      }
+      onSceneTargetChange?.(best?.dataset.sceneTarget || "hero");
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+
+    root.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    update();
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      root.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [project.page.choreography?.enabled, sections, onSceneTargetChange]);
 
   return (
-    <div className={`site-page-layer${interactive ? " is-yielding" : ""}`}>
+    <div ref={layerRef} className={`site-page-layer${interactive ? " is-yielding" : ""}`}>
       {project.page.showNavigation && (
         <nav className="site-nav" aria-label="Published site navigation preview">
           <a className="site-brand" href="#"><BrandMark /> AXM</a>
           <div>{navigation.map((item) => <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>)}</div>
         </nav>
       )}
-      <section className="site-hero">
+      <section className="site-hero" data-scene-target="hero">
         <AnimatedReveal className={`hero-surface surface-${project.page.surface}`} transition={project.page.heroTransition}>
           <p>{project.eyebrow}</p>
           <h1>{project.title}</h1>
-          {project.background.type === "game" ? (
-            <button className="hero-action" onClick={onAction} type="button"><Gamepad2 size={17} /> Enter world</button>
-          ) : (
-            <a className="hero-action" href={firstSection}><Play size={17} /> {project.action}</a>
-          )}
+          {project.background.type === "game"
+            ? <button className="hero-action" onClick={onAction} type="button"><Gamepad2 size={17} /> Enter world</button>
+            : <a className="hero-action" href={firstSection}><Play size={17} /> {project.action}</a>}
           {project.page.heroNote && <small className="hero-note">{project.page.heroNote}</small>}
         </AnimatedReveal>
       </section>
@@ -134,68 +176,41 @@ function PageOverlay({ project, interactive, onAction }) {
               section.visibility?.mobile === false ? " section-mobile-off" : "",
             ].join("");
             return (
-              <AnimatedReveal
-                as="section"
-                className={`site-section surface-${section.surface || "clear"}${visibility}`}
-                id={section.id}
-                key={section.id}
-                transition={section.transition}
-              >
+              <AnimatedReveal as="section" className={`site-section surface-${section.surface || "clear"}${visibility}`} id={section.id} key={section.id} transition={section.transition} data-scene-target={section.id}>
                 <div className="section-label"><span>{section.eyebrow}</span><i /></div>
                 <div className="section-copy">
-                  <h2>{section.title}</h2>
-                  <p>{section.body}</p>
+                  <h2>{section.title}</h2><p>{section.body}</p>
                   {section.points?.length > 0 && <ul>{section.points.map((point) => <li key={point}>{point}</li>)}</ul>}
-                  {section.links?.length > 0 && (
-                    <div className="section-links">
-                      {section.links.map((link) => (
-                        <a className="section-link" href={link.href} key={`${link.href}-${link.label}`} target={link.href.startsWith("http") ? "_blank" : undefined} rel={link.href.startsWith("http") ? "noreferrer" : undefined}>
-                          {link.label} <span aria-hidden="true">↗</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
+                  {section.links?.length > 0 && <div className="section-links">{section.links.map((link) => <a className="section-link" href={link.href} key={`${link.href}-${link.label}`} target={link.href.startsWith("http") ? "_blank" : undefined} rel={link.href.startsWith("http") ? "noreferrer" : undefined}>{link.label} <span aria-hidden="true">↗</span></a>)}</div>}
                 </div>
               </AnimatedReveal>
             );
           })}
         </div>
       )}
-      <footer className="site-footer">
-        <span>{footer.left || "IDEAS SHAPE WORLDS"}</span>
-        <span>{footer.right || "LIVE FRONTEND LAYER"}</span>
-      </footer>
+      <footer className="site-footer"><span>{footer.left || "IDEAS SHAPE WORLDS"}</span><span>{footer.right || "LIVE FRONTEND LAYER"}</span></footer>
     </div>
   );
 }
 
 function Stage({ project, published, interactive, onInteractive, onExit }) {
   const check = validateProject(project);
+  const [sceneTarget, setSceneTarget] = useState("hero");
+  const section = project.page.sections.find((item) => item.id === sceneTarget);
+  const sceneCue = sceneTarget === "hero" ? project.page.heroSceneCue : section?.sceneCue || project.page.heroSceneCue;
+
   return (
     <section className={`stage${published ? " is-published" : ""}${interactive ? " is-interactive" : ""}`} tabIndex={-1}>
-      <BackgroundRuntime project={project} interactive={interactive} />
+      <BackgroundRuntime project={project} interactive={interactive} sceneCue={sceneCue} />
       <div className="stage-vignette" />
-      <PageOverlay
-        project={project}
-        interactive={interactive}
-        onAction={() => project.background.type === "game" && onInteractive()}
-      />
-      {!check.ok && (
-        <div className="hold-card" role="status">
-          <span>Source hold</span>
-          <strong>{check.holds.join(" · ")}</strong>
-          <small>Choose a local file to bind this adapter.</small>
-        </div>
-      )}
-      {project.background.type === "game" && !interactive && check.ok && (
-        <div className="runtime-chip"><Gamepad2 size={14} /> Game ready · page owns input</div>
-      )}
-      {interactive && (
-        <>
-          <div className="game-help"><Gamepad2 size={15} /> Arrow keys pilot the lightcraft</div>
-          <button className="exit-world" onClick={onExit} type="button"><MousePointer2 size={16} /> Return control to page</button>
-        </>
-      )}
+      <PageOverlay project={project} interactive={interactive} onSceneTargetChange={setSceneTarget} onAction={() => project.background.type === "game" && onInteractive()} />
+      {!check.ok && <div className="hold-card" role="status"><span>Source hold</span><strong>{check.holds.join(" · ")}</strong><small>Resolve the project hold before publishing.</small></div>}
+      {project.page.choreography?.enabled && check.ok && <div className="choreography-chip">scene · {sceneTarget}</div>}
+      {project.background.type === "game" && !interactive && check.ok && <div className="runtime-chip"><Gamepad2 size={14} /> Game ready · page owns input</div>}
+      {interactive && <>
+        <div className="game-help"><Gamepad2 size={15} /> Arrow keys pilot the lightcraft</div>
+        <button className="exit-world" onClick={onExit} type="button"><MousePointer2 size={16} /> Return control to page</button>
+      </>}
     </section>
   );
 }
@@ -251,6 +266,10 @@ function SceneRail({ project, session, dispatchHuman, onApplyAiBatch, onExportSe
         </RailRow>
 
         <RailRow icon={PanelTop} label="Page layer">
+          <label className="content-toggle choreography-toggle">
+            <input checked={project.page.choreography?.enabled} onChange={(event) => dispatchHuman([{ type: "choreography.configure", payload: { enabled: event.target.checked } }], "Toggle section choreography")} type="checkbox" />
+            <span>Section choreography</span>
+          </label>
           <div className="surface-switch" aria-label="Page surface">
             {["clear", "glass", "solid"].map((surface) => (
               <button className={project.page.surface === surface ? "is-selected" : ""} key={surface} onClick={() => set("page.surface", surface, "Set hero surface")} type="button">{surface}</button>

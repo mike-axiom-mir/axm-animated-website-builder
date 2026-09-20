@@ -70,6 +70,7 @@ export const AXM_FRONT_DOOR_PROJECT = {
       { label: "Roots", href: "#roots" },
     ],
     heroNote: "Human + machine collaboration with truth, consent, continuity and visible control kept in the loop.",
+    heroSceneCue: { recipe: "calm-intro", overrides: {} },
     sections: [
       {
         id: "why",
@@ -78,6 +79,7 @@ export const AXM_FRONT_DOOR_PROJECT = {
         body: "AXM is a human + AI collaboration project built around a simple boundary: machines can reason, create, challenge and help execute, while goals, consent and ownership stay visible. Useful AI should give people more room to act—not quietly take the steering wheel.",
         surface: "glass",
         ...sectionMotion(),
+        sceneCue: { recipe: "product-reveal", overrides: {} },
         points: [
           "Truth before story",
           "Consent before hidden control",
@@ -91,6 +93,7 @@ export const AXM_FRONT_DOOR_PROJECT = {
         body: "AXM separates durable project state from temporary views. Specialists can inspect, build, test and repair the same source of truth without turning chat history into the product. That makes work easier to verify, recover and move between local tools, websites, games and future machines.",
         surface: "clear",
         ...sectionMotion(),
+        sceneCue: { recipe: "technical", overrides: {} },
         points: [
           "Inspectable state instead of hidden handoffs",
           "Repair, rollback and explicit evidence",
@@ -104,6 +107,7 @@ export const AXM_FRONT_DOOR_PROJECT = {
         body: "The workshop treats software and media as reusable building blocks. A world, interface, asset or tool can be tried in place, saved when it earns its keep, and reused later without forcing the whole system to become one giant engine.",
         surface: "solid",
         ...sectionMotion(),
+        sceneCue: { recipe: "cinematic", overrides: {} },
         points: [
           "Local and offline paths where they matter",
           "Portable project data",
@@ -117,6 +121,7 @@ export const AXM_FRONT_DOOR_PROJECT = {
         body: "AXM is being built around four merge gates: truth, agency without domination, continuity, and wisdom before speed. The goal is not to make AI look independent. The goal is to make collaboration more capable while keeping its reasoning and boundaries legible.",
         surface: "glass",
         ...sectionMotion(),
+        sceneCue: { recipe: "calm-intro", overrides: {} },
         points: [
           "Truth",
           "Agency / non-domination",
